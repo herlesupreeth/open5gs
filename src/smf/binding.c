@@ -215,6 +215,13 @@ void smf_bearer_binding(smf_sess_t *sess)
             } else {
                 ogs_assert(strcmp(bearer->pcc_rule.name, pcc_rule->name) == 0);
 
+                if (pcc_rule->num_of_flow) {
+                    /* We'll use always 'Create new TFT'.
+                     * Therefore, all previous flows are removed
+                     * and replaced by the new flow */
+                    smf_pf_remove_all(bearer);
+                }
+
                 if ((pcc_rule->qos.mbr.downlink &&
                     bearer->qos.mbr.downlink != pcc_rule->qos.mbr.downlink) ||
                     (pcc_rule->qos.mbr.uplink &&
@@ -348,30 +355,30 @@ void smf_bearer_binding(smf_sess_t *sess)
                     }
                     encode_traffic_flow_template(
                         &tft, bearer,
-                        OGS_GTP_TFT_CODE_ADD_PACKET_FILTERS_TO_EXISTING_TFT);
+                        OGS_GTP_TFT_CODE_REPLACE_PACKET_FILTERS_IN_EXISTING);
+
+                    memset(&h, 0, sizeof(ogs_gtp_header_t));
+                    h.type = OGS_GTP_UPDATE_BEARER_REQUEST_TYPE;
+                    h.teid = sess->sgw_s5c_teid;
+
+                    pkbuf = smf_s5c_build_update_bearer_request(
+                            h.type, bearer,
+                            OGS_NAS_PROCEDURE_TRANSACTION_IDENTITY_UNASSIGNED,
+                            pcc_rule->num_of_flow ? &tft : NULL, qos_presence);
+                    ogs_expect_or_return(pkbuf);
+
+                    xact = ogs_gtp_xact_local_create(
+                            sess->gnode, &h, pkbuf, bearer_timeout, bearer);
+                    ogs_expect_or_return(xact);
+
+                    if (pcc_rule->num_of_flow)
+                        xact->update_flags |= OGS_GTP_MODIFY_TFT_UPDATE;
+                    if (qos_presence)
+                        xact->update_flags |= OGS_GTP_MODIFY_QOS_UPDATE;
+
+                    rv = ogs_gtp_xact_commit(xact);
+                    ogs_expect(rv == OGS_OK);
                 }
-
-                memset(&h, 0, sizeof(ogs_gtp_header_t));
-                h.type = OGS_GTP_UPDATE_BEARER_REQUEST_TYPE;
-                h.teid = sess->sgw_s5c_teid;
-
-                pkbuf = smf_s5c_build_update_bearer_request(
-                        h.type, bearer,
-                        OGS_NAS_PROCEDURE_TRANSACTION_IDENTITY_UNASSIGNED,
-                        pcc_rule->num_of_flow ? &tft : NULL, qos_presence);
-                ogs_expect_or_return(pkbuf);
-
-                xact = ogs_gtp_xact_local_create(
-                        sess->gnode, &h, pkbuf, bearer_timeout, bearer);
-                ogs_expect_or_return(xact);
-
-                if (pcc_rule->num_of_flow)
-                    xact->update_flags |= OGS_GTP_MODIFY_TFT_UPDATE;
-                if (qos_presence)
-                    xact->update_flags |= OGS_GTP_MODIFY_QOS_UPDATE;
-
-                rv = ogs_gtp_xact_commit(xact);
-                ogs_expect(rv == OGS_OK);
             }
 
         } else if (pcc_rule->type == OGS_PCC_RULE_TYPE_REMOVE) {
@@ -511,6 +518,13 @@ void smf_qos_flow_binding(smf_sess_t *sess, ogs_sbi_stream_t *stream)
                 ogs_assert_if_reached();
                 ogs_assert(strcmp(qos_flow->pcc_rule.id, pcc_rule->id) == 0);
 
+                if (pcc_rule->num_of_flow) {
+                    /* We'll use always 'Create new TFT'.
+                     * Therefore, all previous flows are removed
+                     * and replaced by the new flow */
+                    smf_pf_remove_all(qos_flow);
+                }
+
                 if ((pcc_rule->qos.mbr.downlink &&
                     qos_flow->qos.mbr.downlink != pcc_rule->qos.mbr.downlink) ||
                     (pcc_rule->qos.mbr.uplink &&
@@ -639,7 +653,7 @@ void smf_qos_flow_binding(smf_sess_t *sess, ogs_sbi_stream_t *stream)
                 if (pcc_rule->num_of_flow)
                     encode_traffic_flow_template(
                         &tft, qos_flow,
-                        OGS_GTP_TFT_CODE_ADD_PACKET_FILTERS_TO_EXISTING_TFT);
+                        OGS_GTP_TFT_CODE_REPLACE_PACKET_FILTERS_IN_EXISTING);
 
                 memset(&h, 0, sizeof(ogs_gtp_header_t));
                 h.type = OGS_GTP_UPDATE_BEARER_REQUEST_TYPE;
