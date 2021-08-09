@@ -397,13 +397,14 @@ void smf_bearer_binding(smf_sess_t *sess)
                     pkbuf = smf_s5c_build_update_bearer_request(
                             h.type, bearer,
                             OGS_NAS_PROCEDURE_TRANSACTION_IDENTITY_UNASSIGNED,
-                            remove_tft.num_of_packet_filter ? &remove_tft : NULL,
-                            qos_presence);
+                            remove_tft.num_of_packet_filter ? &remove_tft : NULL, 0);
                     ogs_expect_or_return(pkbuf);
 
                     xact = ogs_gtp_xact_local_create(
                             sess->gnode, &h, pkbuf, bearer_timeout, bearer);
                     ogs_expect_or_return(xact);
+
+                    xact->update_flags |= OGS_GTP_MODIFY_TFT_UPDATE;
 
                     rv = ogs_gtp_xact_commit(xact);
                     ogs_expect(rv == OGS_OK);
@@ -726,13 +727,14 @@ void smf_qos_flow_binding(smf_sess_t *sess, ogs_sbi_stream_t *stream)
                     pkbuf = smf_s5c_build_update_qos_flow_request(
                             h.type, qos_flow,
                             OGS_NAS_PROCEDURE_TRANSACTION_IDENTITY_UNASSIGNED,
-                            remove_tft.num_of_packet_filter ? &remove_tft : NULL,
-                            qos_presence);
+                            remove_tft.num_of_packet_filter ? &remove_tft : NULL, 0);
                     ogs_expect_or_return(pkbuf);
 
                     xact = ogs_gtp_xact_local_create(
                             sess->gnode, &h, pkbuf, qos_flow_timeout, qos_flow);
                     ogs_expect_or_return(xact);
+
+                    xact->update_flags |= OGS_GTP_MODIFY_TFT_UPDATE;
 
                     rv = ogs_gtp_xact_commit(xact);
                     ogs_expect(rv == OGS_OK);
