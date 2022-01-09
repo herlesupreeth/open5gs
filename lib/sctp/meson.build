@@ -34,21 +34,16 @@ libsctp_sources = files('''
     ogs-sctp.c
 '''.split())
 
-if host_system == 'darwin'
-    sctp_dep = dependency('usrsctp',
-        version: ['>=0.9.5'],
-        fallback: ['usrsctp', 'usrsctp_dep'],
-        default_options: [
-            'sctp_build_programs=false',
+sctp_dep = dependency('usrsctp',
+    version: ['>=0.9.5'],
+    fallback: ['usrsctp', 'usrsctp_dep'],
+    default_options: [
+        'sctp_build_programs=false',
 #            'sctp_debug=@0@'.format(true),
-        ])
+    ])
 
-    libsctp_sources += files('ogs-usrsctp.c')
-    libsctp_conf.set('HAVE_USRSCTP', 1)
-else
-    sctp_dep = cc.find_library('sctp', required : false)
-    libsctp_sources += files('ogs-lksctp.c')
-endif
+libsctp_sources += files('ogs-usrsctp.c')
+libsctp_conf.set('HAVE_USRSCTP', 1)
 
 configure_file(output : 'sctp-config.h', configuration : libsctp_conf)
 
