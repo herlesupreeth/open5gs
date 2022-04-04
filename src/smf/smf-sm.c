@@ -23,10 +23,31 @@
 #include "pfcp-path.h"
 #include "sbi-path.h"
 #include "s5c-handler.h"
+#include "gn-handler.h"
 #include "gx-handler.h"
 #include "nnrf-handler.h"
 #include "namf-handler.h"
 #include "npcf-handler.h"
+
+static uint8_t gtp_cause_from_diameter(
+        const uint32_t *dia_err, const uint32_t *dia_exp_err)
+{
+    if (dia_exp_err) {
+    }
+    if (dia_err) {
+        switch (*dia_err) {
+        case OGS_DIAM_UNKNOWN_SESSION_ID:
+            return OGS_GTP_CAUSE_APN_ACCESS_DENIED_NO_SUBSCRIPTION;
+        case ER_DIAMETER_UNABLE_TO_DELIVER:
+            return OGS_GTP_CAUSE_REMOTE_PEER_NOT_RESPONDING;
+        }
+    }
+
+    ogs_error("Unexpected Diameter Result Code %d/%d, defaulting to severe "
+              "network failure",
+              dia_err ? *dia_err : -1, dia_exp_err ? *dia_exp_err : -1);
+    return OGS_GTP_CAUSE_UE_NOT_AUTHORISED_BY_OCS_OR_EXTERNAL_AAA_SERVER;
+}
 
 void smf_state_initial(ogs_fsm_t *s, smf_event_t *e)
 {
@@ -56,6 +77,7 @@ void smf_state_operational(ogs_fsm_t *s, smf_event_t *e)
     ogs_gtp_node_t *gnode = NULL;
     ogs_gtp_xact_t *gtp_xact = NULL;
     ogs_gtp_message_t gtp_message;
+    ogs_gtp1_message_t gtp1_message;
 
     ogs_diam_gx_message_t *gx_message = NULL;
 
@@ -163,11 +185,74 @@ void smf_state_operational(ogs_fsm_t *s, smf_event_t *e)
         ogs_pkbuf_free(recvbuf);
         break;
 
-    case SMF_EVT_GX_MESSAGE:
+    case SMF_EVT_GN_MESSAGE:
         ogs_assert(e);
         recvbuf = e->pkbuf;
         ogs_assert(recvbuf);
-        gx_message = (ogs_diam_gx_message_t *)recvbuf->data;
+
+        if (ogs_gtp1_parse_msg(&gtp1_message, recvbuf) != OGS_OK) {
+            ogs_error("ogs_gtp_parse_msg() failed");
+            ogs_pkbuf_free(recvbuf);
+            break;
+        }
+
+        if (gtp1_message.h.teid != 0) {
+            sess = smf_sess_find_by_teid(gtp1_message.h.teid);
+        }
+
+        if (sess) {
+            gnode = sess->gnode;
+            ogs_assert(gnode);
+        } else {
+            gnode = e->gnode;
+            ogs_assert(gnode);
+        }
+
+        rv = ogs_gtp1_xact_receive(gnode, &gtp1_message.h, &gtp_xact);
+        if (rv != OGS_OK) {
+            ogs_pkbuf_free(recvbuf);
+            break;
+        }
+
+        switch(gtp1_message.h.type) {
+        case OGS_GTP1_ECHO_REQUEST_TYPE:
+            smf_gn_handle_echo_request(gtp_xact, &gtp1_message.echo_request);
+            break;
+        case OGS_GTP1_ECHO_RESPONSE_TYPE:
+            smf_gn_handle_echo_response(gtp_xact, &gtp1_message.echo_response);
+            break;
+        case OGS_GTP1_CREATE_PDP_CONTEXT_REQUEST_TYPE:
+            if (gtp1_message.h.teid == 0) {
+                ogs_expect(!sess);
+                sess = smf_sess_add_by_gtp1_message(&gtp1_message);
+                if (sess)
+                    OGS_SETUP_GTP_NODE(sess, gnode);
+            }
+            smf_gn_handle_create_pdp_context_request(
+                sess, gtp_xact, &gtp1_message.create_pdp_context_request);
+            break;
+        case OGS_GTP1_DELETE_PDP_CONTEXT_REQUEST_TYPE:
+            smf_gn_handle_delete_pdp_context_request(
+                sess, gtp_xact, &gtp1_message.delete_pdp_context_request);
+            break;
+        case OGS_GTP1_UPDATE_PDP_CONTEXT_REQUEST_TYPE:
+            smf_gn_handle_update_pdp_context_request(
+                sess, gtp_xact, &gtp1_message.update_pdp_context_request);
+            break;
+        case OGS_GTP1_ERROR_INDICATION_TYPE:
+            /* TS 29.060 10.1.1.4 dst port shall be the user plane port (2152) */
+            ogs_error("Rx unexpected Error Indication in GTPC port");
+            break;
+        default:
+            ogs_warn("Not implmeneted(type:%d)", gtp1_message.h.type);
+            break;
+        }
+        ogs_pkbuf_free(recvbuf);
+        break;
+
+    case SMF_EVT_GX_MESSAGE:
+        ogs_assert(e);
+        gx_message = e->gx_message;
         ogs_assert(gx_message);
 
         sess = e->sess;
@@ -177,6 +262,22 @@ void smf_state_operational(ogs_fsm_t *s, smf_event_t *e)
         case OGS_DIAM_GX_CMD_CODE_CREDIT_CONTROL:
             gtp_xact = e->gtp_xact;
             ogs_assert(gtp_xact);
+
+            if (gx_message->result_code != ER_DIAMETER_SUCCESS) {
+                uint8_t cause_value = gtp_cause_from_diameter(
+                    gx_message->err, gx_message->exp_err);
+
+                if (gtp_xact->gtp_version == 1)
+                    ogs_gtp1_send_error_message(
+                        gtp_xact, sess ? sess->sgw_s5c_teid : 0,
+                        OGS_GTP1_CREATE_PDP_CONTEXT_RESPONSE_TYPE, cause_value);
+                else
+                    ogs_gtp_send_error_message(
+                        gtp_xact, sess ? sess->sgw_s5c_teid : 0,
+                        OGS_GTP_CREATE_SESSION_RESPONSE_TYPE, cause_value);
+
+                break;
+            }
 
             switch(gx_message->cc_request_type) {
             case OGS_DIAM_GX_CC_REQUEST_TYPE_INITIAL_REQUEST:
@@ -202,7 +303,7 @@ void smf_state_operational(ogs_fsm_t *s, smf_event_t *e)
         }
 
         ogs_session_data_free(&gx_message->session_data);
-        ogs_pkbuf_free(recvbuf);
+        ogs_free(gx_message);
         break;
     case SMF_EVT_N4_MESSAGE:
         ogs_assert(e);
@@ -527,7 +628,7 @@ void smf_state_operational(ogs_fsm_t *s, smf_event_t *e)
                     ogs_assert_if_reached();
                 END
                 break;
-            
+
             DEFAULT
                 ogs_error("Invalid resource name [%s]",
                         sbi_message.h.resource.component[0]);
@@ -656,16 +757,6 @@ void smf_state_operational(ogs_fsm_t *s, smf_event_t *e)
             }
             break;
 
-        case SMF_TIMER_RELEASE_HOLDING:
-            sess = e->sbi.data;
-            ogs_assert(sess);
-            sess = smf_sess_cycle(sess);
-            ogs_assert(sess);
-
-            ogs_assert(true == smf_sbi_send_sm_context_status_notify(sess));
-            SMF_SESS_CLEAR(sess);
-            break;
-
         default:
             ogs_error("Unknown timer[%s:%d]",
                     smf_timer_get_name(e->timer_id), e->timer_id);
@@ -691,11 +782,19 @@ void smf_state_operational(ogs_fsm_t *s, smf_event_t *e)
 
         sess->pti = nas_message.gsm.h.procedure_transaction_identity;
 
-        e->nas.message = &nas_message;
-        ogs_fsm_dispatch(&sess->sm, e);
-        if (OGS_FSM_CHECK(&sess->sm, smf_gsm_state_exception)) {
-            ogs_error("State machine exception");
+        switch (nas_message.gsm.h.message_type) {
+        case OGS_NAS_5GS_PDU_SESSION_RELEASE_COMPLETE:
+            ogs_assert(true == ogs_sbi_send_http_status_no_content(stream));
+            ogs_assert(true == smf_sbi_send_sm_context_status_notify(sess));
             SMF_SESS_CLEAR(sess);
+            break;
+        default:
+            e->nas.message = &nas_message;
+            ogs_fsm_dispatch(&sess->sm, e);
+            if (OGS_FSM_CHECK(&sess->sm, smf_gsm_state_exception)) {
+                ogs_error("State machine exception");
+                SMF_SESS_CLEAR(sess);
+            }
         }
 
         ogs_pkbuf_free(pkbuf);

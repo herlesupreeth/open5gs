@@ -20,7 +20,7 @@
 /*******************************************************************************
  * This file had been created by pfcp-tlv.py script v0.1.0
  * Please do not modify this file but regenerate it via script.
- * Created on: 2021-10-04 22:09:12.899719 by acetcom
+ * Created on: 2022-03-30 17:00:53.600137 by pespin
  * from 29244-g10.docx
  ******************************************************************************/
 
@@ -654,7 +654,7 @@ typedef struct ogs_pfcp_tlv_create_pdr_s {
     ogs_pfcp_tlv_pdi_t pdi;
     ogs_pfcp_tlv_outer_header_removal_t outer_header_removal;
     ogs_pfcp_tlv_far_id_t far_id;
-    ogs_pfcp_tlv_urr_id_t urr_id;
+    ogs_pfcp_tlv_urr_id_t urr_id[8];
     ogs_pfcp_tlv_qer_id_t qer_id;
     ogs_pfcp_tlv_activate_predefined_rules_t activate_predefined_rules;
     ogs_pfcp_tlv_activation_time_t activation_time;
@@ -747,7 +747,7 @@ typedef struct ogs_pfcp_tlv_access_forwarding_action_information_1_s {
     ogs_pfcp_tlv_far_id_t far_id;
     ogs_pfcp_tlv_weight_t weight;
     ogs_pfcp_tlv_priority_t priority;
-    ogs_pfcp_tlv_urr_id_t urr_id;
+    ogs_pfcp_tlv_urr_id_t urr_id[8];
 } ogs_pfcp_tlv_access_forwarding_action_information_1_t;
 
 typedef struct ogs_pfcp_tlv_access_forwarding_action_information_2_s {
@@ -755,7 +755,7 @@ typedef struct ogs_pfcp_tlv_access_forwarding_action_information_2_s {
     ogs_pfcp_tlv_far_id_t far_id;
     ogs_pfcp_tlv_weight_t weight;
     ogs_pfcp_tlv_priority_t priority;
-    ogs_pfcp_tlv_urr_id_t urr_id;
+    ogs_pfcp_tlv_urr_id_t urr_id[8];
 } ogs_pfcp_tlv_access_forwarding_action_information_2_t;
 
 typedef struct ogs_pfcp_tlv_update_access_forwarding_action_information_1_s {
@@ -1257,7 +1257,7 @@ typedef struct ogs_pfcp_session_modification_response_s {
     ogs_pfcp_tlv_created_pdr_t created_pdr[8];
     ogs_pfcp_tlv_load_control_information_t load_control_information;
     ogs_pfcp_tlv_overload_control_information_t overload_control_information;
-    ogs_pfcp_tlv_usage_report_session_modification_response_t usage_report;
+    ogs_pfcp_tlv_usage_report_session_modification_response_t usage_report[8];
     ogs_pfcp_tlv_failed_rule_id_t failed_rule_id;
     ogs_pfcp_tlv_additional_usage_reports_information_t additional_usage_reports_information;
     ogs_pfcp_tlv_created_traffic_endpoint_t created_updated_traffic_endpoint;
@@ -1271,13 +1271,13 @@ typedef struct ogs_pfcp_session_deletion_response_s {
     ogs_pfcp_tlv_offending_ie_t offending_ie;
     ogs_pfcp_tlv_load_control_information_t load_control_information;
     ogs_pfcp_tlv_overload_control_information_t overload_control_information;
-    ogs_pfcp_tlv_usage_report_session_deletion_response_t usage_report;
+    ogs_pfcp_tlv_usage_report_session_deletion_response_t usage_report[8];
 } ogs_pfcp_session_deletion_response_t;
 
 typedef struct ogs_pfcp_session_report_request_s {
     ogs_pfcp_tlv_report_type_t report_type;
     ogs_pfcp_tlv_downlink_data_report_t downlink_data_report;
-    ogs_pfcp_tlv_usage_report_session_report_request_t usage_report;
+    ogs_pfcp_tlv_usage_report_session_report_request_t usage_report[8];
     ogs_pfcp_tlv_error_indication_report_t error_indication_report;
     ogs_pfcp_tlv_load_control_information_t load_control_information;
     ogs_pfcp_tlv_overload_control_information_t overload_control_information;

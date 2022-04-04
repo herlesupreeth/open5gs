@@ -73,7 +73,7 @@ With the exception of the SMF and UPF, all config files for the 5G SA core funct
 
 #### Ubuntu
 
-*Ubuntu* makes it easy to install Open5GS as shown below,
+*Ubuntu* makes it easy to install Open5GS as shown below.
 
 ```bash
 $ sudo apt update
@@ -111,6 +111,7 @@ https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbunt
 https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_20.04/
 https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_20.10/
 https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_21.04/
+https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_21.10/
 ```
 
 #### openSUSE
@@ -147,6 +148,7 @@ https://download.opensuse.org/repositories/network:/osmocom:/nightly/xUbuntu_18.
 https://download.opensuse.org/repositories/network:/osmocom:/nightly/xUbuntu_20.04/
 https://download.opensuse.org/repositories/network:/osmocom:/nightly/xUbuntu_20.10/
 https://download.opensuse.org/repositories/network:/osmocom:/nightly/xUbuntu_21.04/
+https://download.opensuse.org/repositories/network:/osmocom:/nightly/xUbuntu_21.10/
 ```
 
 
@@ -343,7 +345,7 @@ upf:
 +      - addr: 10.11.0.7 # for external gNB - a local address that can be reached by the gNB
      subnet:
        - addr: 10.45.0.1/16
-       - addr: 2001:230:cafe::1/48
+       - addr: 2001:db8:cafe::1/48
 
 ```
 
@@ -423,7 +425,7 @@ $ sudo sysctl -w net.ipv6.conf.all.forwarding=1
 
 ### Add NAT Rule
 $ sudo iptables -t nat -A POSTROUTING -s 10.45.0.0/16 ! -o ogstun -j MASQUERADE
-$ sudo ip6tables -t nat -A POSTROUTING -s 2001:230:cafe::/48 ! -o ogstun -j MASQUERADE
+$ sudo ip6tables -t nat -A POSTROUTING -s 2001:db8:cafe::/48 ! -o ogstun -j MASQUERADE
 ```
 
 

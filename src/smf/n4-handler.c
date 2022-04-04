@@ -27,42 +27,82 @@
 #include "sbi-path.h"
 #include "ngap-path.h"
 
-static uint8_t gtp_cause_from_pfcp(uint8_t pfcp_cause)
+uint8_t gtp_cause_from_pfcp(uint8_t pfcp_cause, uint8_t gtp_version)
 {
-    switch (pfcp_cause) {
-    case OGS_PFCP_CAUSE_REQUEST_ACCEPTED:
-        return OGS_GTP_CAUSE_REQUEST_ACCEPTED;
-    case OGS_PFCP_CAUSE_REQUEST_REJECTED:
-        return OGS_GTP_CAUSE_REQUEST_REJECTED_REASON_NOT_SPECIFIED;
-    case OGS_PFCP_CAUSE_SESSION_CONTEXT_NOT_FOUND:
-        return OGS_GTP_CAUSE_CONTEXT_NOT_FOUND;
-    case OGS_PFCP_CAUSE_MANDATORY_IE_MISSING:
-        return OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
-    case OGS_PFCP_CAUSE_CONDITIONAL_IE_MISSING:
-        return OGS_GTP_CAUSE_CONDITIONAL_IE_MISSING;
-    case OGS_PFCP_CAUSE_INVALID_LENGTH:
-        return OGS_GTP_CAUSE_INVALID_LENGTH;
-    case OGS_PFCP_CAUSE_MANDATORY_IE_INCORRECT:
-        return OGS_GTP_CAUSE_MANDATORY_IE_INCORRECT;
-    case OGS_PFCP_CAUSE_INVALID_FORWARDING_POLICY:
-    case OGS_PFCP_CAUSE_INVALID_F_TEID_ALLOCATION_OPTION:
-        return OGS_GTP_CAUSE_INVALID_MESSAGE_FORMAT;
-    case OGS_PFCP_CAUSE_NO_ESTABLISHED_PFCP_ASSOCIATION:
-        return OGS_GTP_CAUSE_REMOTE_PEER_NOT_RESPONDING;
-    case OGS_PFCP_CAUSE_RULE_CREATION_MODIFICATION_FAILURE:
-        return OGS_GTP_CAUSE_SEMANTIC_ERROR_IN_THE_TFT_OPERATION;
-    case OGS_PFCP_CAUSE_PFCP_ENTITY_IN_CONGESTION:
-        return OGS_GTP_CAUSE_GTP_C_ENTITY_CONGESTION;
-    case OGS_PFCP_CAUSE_NO_RESOURCES_AVAILABLE:
-        return OGS_GTP_CAUSE_NO_RESOURCES_AVAILABLE;
-    case OGS_PFCP_CAUSE_SERVICE_NOT_SUPPORTED:
-        return OGS_GTP_CAUSE_SERVICE_NOT_SUPPORTED;
-    case OGS_PFCP_CAUSE_SYSTEM_FAILURE:
-        return OGS_GTP_CAUSE_SYSTEM_FAILURE;
-    case OGS_PFCP_CAUSE_ALL_DYNAMIC_ADDRESS_ARE_OCCUPIED:
-        return OGS_GTP_CAUSE_ALL_DYNAMIC_ADDRESSES_ARE_OCCUPIED;
-    default:
-        return OGS_GTP_CAUSE_SYSTEM_FAILURE;
+    switch (gtp_version) {
+        case 1:
+            switch (pfcp_cause) {
+            case OGS_PFCP_CAUSE_REQUEST_ACCEPTED:
+                return OGS_GTP1_CAUSE_REQUEST_ACCEPTED;
+            case OGS_PFCP_CAUSE_REQUEST_REJECTED:
+                return OGS_GTP1_CAUSE_REJ_MS_NOT_GPRS_RESPONDING;
+            case OGS_PFCP_CAUSE_SESSION_CONTEXT_NOT_FOUND:
+                return OGS_GTP1_CAUSE_CONTEXT_NOT_FOUND;
+            case OGS_PFCP_CAUSE_MANDATORY_IE_MISSING:
+            case OGS_PFCP_CAUSE_CONDITIONAL_IE_MISSING:
+                return OGS_GTP1_CAUSE_MANDATORY_IE_MISSING;
+            case OGS_PFCP_CAUSE_INVALID_LENGTH:
+                return OGS_GTP1_CAUSE_INVALID_MESSAGE_FORMAT;
+            case OGS_PFCP_CAUSE_MANDATORY_IE_INCORRECT:
+                return OGS_GTP1_CAUSE_MANDATORY_IE_INCORRECT;
+            case OGS_PFCP_CAUSE_INVALID_FORWARDING_POLICY:
+            case OGS_PFCP_CAUSE_INVALID_F_TEID_ALLOCATION_OPTION:
+                return OGS_GTP1_CAUSE_INVALID_MESSAGE_FORMAT;
+            case OGS_PFCP_CAUSE_NO_ESTABLISHED_PFCP_ASSOCIATION:
+                return OGS_GTP1_CAUSE_NO_RESOURCES_AVAILABLE;
+            case OGS_PFCP_CAUSE_RULE_CREATION_MODIFICATION_FAILURE:
+                return OGS_GTP1_CAUSE_SEMANTIC_ERR_TFT_OPERATION;
+            case OGS_PFCP_CAUSE_PFCP_ENTITY_IN_CONGESTION:
+                return OGS_GTP1_CAUSE_APN_CONGESTION;
+            case OGS_PFCP_CAUSE_NO_RESOURCES_AVAILABLE:
+                return OGS_GTP1_CAUSE_NO_RESOURCES_AVAILABLE;
+            case OGS_PFCP_CAUSE_SERVICE_NOT_SUPPORTED:
+                return OGS_GTP1_CAUSE_SERVICE_NOT_SUPPORTED;
+            case OGS_PFCP_CAUSE_SYSTEM_FAILURE:
+                return OGS_GTP1_CAUSE_SYSTEM_FAILURE;
+            case OGS_PFCP_CAUSE_ALL_DYNAMIC_ADDRESS_ARE_OCCUPIED:
+                return OGS_GTP1_CAUSE_ALL_DYNAMIC_PDP_ADDRS_OCCUPIED;
+            default:
+                return OGS_GTP1_CAUSE_SYSTEM_FAILURE;
+            }
+            break;
+        case 2:
+            switch (pfcp_cause) {
+            case OGS_PFCP_CAUSE_REQUEST_ACCEPTED:
+                return OGS_GTP_CAUSE_REQUEST_ACCEPTED;
+            case OGS_PFCP_CAUSE_REQUEST_REJECTED:
+                return OGS_GTP_CAUSE_REQUEST_REJECTED_REASON_NOT_SPECIFIED;
+            case OGS_PFCP_CAUSE_SESSION_CONTEXT_NOT_FOUND:
+                return OGS_GTP_CAUSE_CONTEXT_NOT_FOUND;
+            case OGS_PFCP_CAUSE_MANDATORY_IE_MISSING:
+                return OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
+            case OGS_PFCP_CAUSE_CONDITIONAL_IE_MISSING:
+                return OGS_GTP_CAUSE_CONDITIONAL_IE_MISSING;
+            case OGS_PFCP_CAUSE_INVALID_LENGTH:
+                return OGS_GTP_CAUSE_INVALID_LENGTH;
+            case OGS_PFCP_CAUSE_MANDATORY_IE_INCORRECT:
+                return OGS_GTP_CAUSE_MANDATORY_IE_INCORRECT;
+            case OGS_PFCP_CAUSE_INVALID_FORWARDING_POLICY:
+            case OGS_PFCP_CAUSE_INVALID_F_TEID_ALLOCATION_OPTION:
+                return OGS_GTP_CAUSE_INVALID_MESSAGE_FORMAT;
+            case OGS_PFCP_CAUSE_NO_ESTABLISHED_PFCP_ASSOCIATION:
+                return OGS_GTP_CAUSE_REMOTE_PEER_NOT_RESPONDING;
+            case OGS_PFCP_CAUSE_RULE_CREATION_MODIFICATION_FAILURE:
+                return OGS_GTP_CAUSE_SEMANTIC_ERROR_IN_THE_TFT_OPERATION;
+            case OGS_PFCP_CAUSE_PFCP_ENTITY_IN_CONGESTION:
+                return OGS_GTP_CAUSE_GTP_C_ENTITY_CONGESTION;
+            case OGS_PFCP_CAUSE_NO_RESOURCES_AVAILABLE:
+                return OGS_GTP_CAUSE_NO_RESOURCES_AVAILABLE;
+            case OGS_PFCP_CAUSE_SERVICE_NOT_SUPPORTED:
+                return OGS_GTP_CAUSE_SERVICE_NOT_SUPPORTED;
+            case OGS_PFCP_CAUSE_SYSTEM_FAILURE:
+                return OGS_GTP_CAUSE_SYSTEM_FAILURE;
+            case OGS_PFCP_CAUSE_ALL_DYNAMIC_ADDRESS_ARE_OCCUPIED:
+                return OGS_GTP_CAUSE_ALL_DYNAMIC_ADDRESSES_ARE_OCCUPIED;
+            default:
+                return OGS_GTP_CAUSE_SYSTEM_FAILURE;
+            }
+            break;
     }
 
     return OGS_GTP_CAUSE_SYSTEM_FAILURE;
@@ -116,6 +156,8 @@ void smf_5gc_n4_handle_session_establishment_response(
 
     ogs_assert(xact);
     ogs_assert(rsp);
+
+    ogs_debug("Session Establishment Response [5gc]");
 
     stream = xact->assoc_stream;
     ogs_assert(stream);
@@ -224,6 +266,8 @@ void smf_5gc_n4_handle_session_modification_response(
 
     ogs_assert(xact);
     ogs_assert(rsp);
+
+    ogs_debug("Session Modification Response [5gc]");
 
     flags = xact->modify_flags;
     ogs_assert(flags);
@@ -578,6 +622,8 @@ void smf_5gc_n4_handle_session_deletion_response(
     ogs_assert(xact);
     ogs_assert(rsp);
 
+    ogs_debug("Session Deletion Response [5gc]");
+
     stream = xact->assoc_stream;
     trigger = xact->delete_trigger;
     ogs_assert(trigger);
@@ -681,6 +727,7 @@ void smf_epc_n4_handle_session_establishment_response(
         ogs_pfcp_session_establishment_response_t *rsp)
 {
     uint8_t cause_value = 0;
+    uint8_t resp_type = 0;
 
     smf_bearer_t *bearer = NULL;
     ogs_gtp_xact_t *gtp_xact = NULL;
@@ -690,39 +737,56 @@ void smf_epc_n4_handle_session_establishment_response(
     ogs_assert(xact);
     ogs_assert(rsp);
 
+    ogs_debug("Session Establishment Response [epc]");
+
     gtp_xact = xact->assoc_xact;
     ogs_assert(gtp_xact);
 
     ogs_pfcp_xact_commit(xact);
 
-    cause_value = OGS_GTP_CAUSE_REQUEST_ACCEPTED;
+    if (gtp_xact->gtp_version == 1) {
+        cause_value = OGS_GTP1_CAUSE_REQUEST_ACCEPTED;
+        resp_type = OGS_GTP1_CREATE_PDP_CONTEXT_RESPONSE_TYPE;
+    } else {
+        cause_value = OGS_GTP_CAUSE_REQUEST_ACCEPTED;
+        resp_type = OGS_GTP_CREATE_SESSION_RESPONSE_TYPE;
+    }
 
     if (!sess) {
         ogs_warn("No Context");
-        cause_value = OGS_GTP_CAUSE_CONTEXT_NOT_FOUND;
+        cause_value = (gtp_xact->gtp_version == 1) ?
+                        OGS_GTP1_CAUSE_CONTEXT_NOT_FOUND :
+                        OGS_GTP_CAUSE_CONTEXT_NOT_FOUND;
     }
 
     if (rsp->up_f_seid.presence == 0) {
         ogs_error("No UP F-SEID");
-        cause_value = OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
+        cause_value = (gtp_xact->gtp_version == 1) ?
+                        OGS_GTP1_CAUSE_MANDATORY_IE_MISSING :
+                        OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
     }
 
     if (rsp->created_pdr[0].presence == 0) {
         ogs_error("No Created PDR");
-        cause_value = OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
+        cause_value = (gtp_xact->gtp_version == 1) ?
+                        OGS_GTP1_CAUSE_MANDATORY_IE_MISSING :
+                        OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
     }
 
     if (rsp->cause.presence) {
         if (rsp->cause.u8 != OGS_PFCP_CAUSE_REQUEST_ACCEPTED) {
             ogs_warn("PFCP Cause [%d] : Not Accepted", rsp->cause.u8);
-            cause_value = gtp_cause_from_pfcp(rsp->cause.u8);
+            cause_value = gtp_cause_from_pfcp(rsp->cause.u8, gtp_xact->gtp_version);
         }
     } else {
         ogs_error("No Cause");
-        cause_value = OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
+        cause_value = (gtp_xact->gtp_version == 1) ?
+                        OGS_GTP1_CAUSE_MANDATORY_IE_MISSING :
+                        OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
     }
 
-    if (cause_value == OGS_GTP_CAUSE_REQUEST_ACCEPTED) {
+    if ((gtp_xact->gtp_version == 1 && cause_value == OGS_GTP1_CAUSE_REQUEST_ACCEPTED) ||
+        (gtp_xact->gtp_version == 2 && cause_value == OGS_GTP_CAUSE_REQUEST_ACCEPTED)) {
         int i;
 
         uint8_t pfcp_cause_value = OGS_PFCP_CAUSE_REQUEST_ACCEPTED;
@@ -772,12 +836,14 @@ void smf_epc_n4_handle_session_establishment_response(
             }
         }
 
-        cause_value = gtp_cause_from_pfcp(pfcp_cause_value);
+        cause_value = gtp_cause_from_pfcp(pfcp_cause_value, gtp_xact->gtp_version);
     }
 
-    if (cause_value != OGS_GTP_CAUSE_REQUEST_ACCEPTED) {
+
+    if ((gtp_xact->gtp_version == 1 && cause_value != OGS_GTP1_CAUSE_REQUEST_ACCEPTED) ||
+        (gtp_xact->gtp_version == 2 && cause_value != OGS_GTP_CAUSE_REQUEST_ACCEPTED)) {
         ogs_gtp_send_error_message(gtp_xact, sess ? sess->sgw_s5c_teid : 0,
-                OGS_GTP_CREATE_SESSION_RESPONSE_TYPE, cause_value);
+                resp_type, cause_value);
         return;
     }
 
@@ -788,8 +854,9 @@ void smf_epc_n4_handle_session_establishment_response(
     if (bearer->pgw_s5u_addr == NULL && bearer->pgw_s5u_addr6 == NULL) {
         ogs_error("No UP F-TEID");
         ogs_gtp_send_error_message(gtp_xact, sess ? sess->sgw_s5c_teid : 0,
-                OGS_GTP_CREATE_SESSION_RESPONSE_TYPE,
-                OGS_GTP_CAUSE_GRE_KEY_NOT_FOUND);
+                resp_type,
+                (gtp_xact->gtp_version == 1) ?
+                OGS_GTP1_CAUSE_CONTEXT_NOT_FOUND : OGS_GTP_CAUSE_GRE_KEY_NOT_FOUND);
         return;
     }
 
@@ -798,7 +865,14 @@ void smf_epc_n4_handle_session_establishment_response(
     ogs_assert(up_f_seid);
     sess->upf_n4_seid = be64toh(up_f_seid->seid);
 
-    ogs_assert(OGS_OK == smf_gtp_send_create_session_response(sess, gtp_xact));
+    switch (gtp_xact->gtp_version) {
+    case 1:
+        ogs_assert(OGS_OK == smf_gtp1_send_create_pdp_context_response(sess, gtp_xact));
+        break;
+    case 2:
+        ogs_assert(OGS_OK == smf_gtp_send_create_session_response(sess, gtp_xact));
+        break;
+    }
 
     if (sess->gtp_rat_type == OGS_GTP_RAT_TYPE_WLAN) {
         /*
@@ -848,6 +922,8 @@ void smf_epc_n4_handle_session_modification_response(
 
     ogs_assert(xact);
     ogs_assert(rsp);
+
+    ogs_debug("Session Modification Response [epc]");
 
     if (flags & OGS_PFCP_MODIFY_SESSION) {
         /* If smf_epc_pfcp_send_session_modification_request() is called */
@@ -1029,7 +1105,17 @@ void smf_epc_n4_handle_session_modification_response(
         }
 
     } else if (flags & OGS_PFCP_MODIFY_ACTIVATE) {
-        /* Nothing */
+        if (gtp_xact) {
+            /* SMF send Update PDP Context Response (GTPv1C) to SGSN */
+            if (gtp_xact->gtp_version == 1) {
+                bearer = gtp_xact->data;
+                smf_gtp1_send_update_pdp_context_response(bearer, gtp_xact);
+            } else {
+                /* TODO: SMF send Modify Bearer Response (GTPv2C) to SGWC */
+            }
+        } else {
+            /* Nothing */
+        }
     }
 }
 
@@ -1038,36 +1124,53 @@ void smf_epc_n4_handle_session_deletion_response(
         ogs_pfcp_session_deletion_response_t *rsp)
 {
     uint8_t cause_value = 0;
+    uint8_t resp_type = 0;
     ogs_gtp_xact_t *gtp_xact = NULL;
 
     ogs_assert(xact);
     ogs_assert(rsp);
 
+    ogs_debug("Session Deletion Response [epc]");
+
     gtp_xact = xact->assoc_xact;
 
     ogs_pfcp_xact_commit(xact);
 
-    cause_value = OGS_GTP_CAUSE_REQUEST_ACCEPTED;
+    /* If !gtp_xact, set it to whatever valid, nothing is sent in the end anyway */
+    uint8_t gtp_version = gtp_xact ? gtp_xact->gtp_version : 2;
+
+    if (gtp_version == 1) {
+        resp_type = OGS_GTP1_DELETE_PDP_CONTEXT_RESPONSE_TYPE;
+        cause_value = OGS_GTP1_CAUSE_REQUEST_ACCEPTED;
+    } else {
+        resp_type = OGS_GTP_DELETE_SESSION_RESPONSE_TYPE;
+        cause_value = OGS_GTP_CAUSE_REQUEST_ACCEPTED;
+    }
 
     if (!sess) {
         ogs_warn("No Context");
-        cause_value = OGS_GTP_CAUSE_CONTEXT_NOT_FOUND;
+        cause_value = (gtp_version == 1) ?
+                        OGS_GTP1_CAUSE_NON_EXISTENT :
+                        OGS_GTP_CAUSE_CONTEXT_NOT_FOUND;
     }
 
     if (rsp->cause.presence) {
         if (rsp->cause.u8 != OGS_PFCP_CAUSE_REQUEST_ACCEPTED) {
             ogs_warn("PFCP Cause[%d] : Not Accepted", rsp->cause.u8);
-            cause_value = gtp_cause_from_pfcp(rsp->cause.u8);
+            cause_value = gtp_cause_from_pfcp(rsp->cause.u8, gtp_version);
         }
     } else {
         ogs_error("No Cause");
-        cause_value = OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
+        cause_value = (gtp_xact->gtp_version == 1) ?
+                        OGS_GTP1_CAUSE_MANDATORY_IE_MISSING :
+                        OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
     }
 
-    if (cause_value != OGS_GTP_CAUSE_REQUEST_ACCEPTED) {
-        if (gtp_xact)
-            ogs_gtp_send_error_message(gtp_xact, sess ? sess->sgw_s5c_teid : 0,
-                    OGS_GTP_DELETE_SESSION_RESPONSE_TYPE, cause_value);
+    if (gtp_xact &&
+        ((gtp_version == 1 && cause_value != OGS_GTP1_CAUSE_REQUEST_ACCEPTED) ||
+         (gtp_version == 2 && cause_value != OGS_GTP_CAUSE_REQUEST_ACCEPTED))) {
+        ogs_gtp_send_error_message(gtp_xact, sess->sgw_s5c_teid, resp_type,
+                cause_value);
         return;
     }
 
@@ -1078,8 +1181,14 @@ void smf_epc_n4_handle_session_deletion_response(
          * 1. MME sends Delete Session Request to SGW/SMF.
          * 2. SMF sends Delete Session Response to SGW/MME.
          */
-        ogs_assert(OGS_OK ==
-                smf_gtp_send_delete_session_response(sess, gtp_xact));
+        switch (gtp_version) {
+        case 1:
+            ogs_assert(OGS_OK == smf_gtp1_send_delete_pdp_context_response(sess, gtp_xact));
+            break;
+        case 2:
+            ogs_assert(OGS_OK == smf_gtp_send_delete_session_response(sess, gtp_xact));
+            break;
+        }
     } else {
         /*
          * 1. SMF sends Delete Bearer Request(DEFAULT BEARER) to SGW/MME.
@@ -1112,6 +1221,8 @@ void smf_n4_handle_session_report_request(
 
     ogs_assert(pfcp_xact);
     ogs_assert(pfcp_req);
+
+    ogs_debug("Session Report Request");
 
     cause_value = OGS_GTP_CAUSE_REQUEST_ACCEPTED;
 
@@ -1199,10 +1310,6 @@ void smf_n4_handle_session_report_request(
             return;
         }
 
-        ogs_assert(OGS_OK ==
-            smf_pfcp_send_session_report_response(
-                pfcp_xact, sess, OGS_PFCP_CAUSE_REQUEST_ACCEPTED));
-
         if (sess->paging.ue_requested_pdu_session_establishment_done == true) {
             smf_n1_n2_message_transfer_param_t param;
 
@@ -1216,28 +1323,31 @@ void smf_n4_handle_session_report_request(
 
             smf_namf_comm_send_n1_n2_message_transfer(sess, &param);
         }
+    }
 
-    } else if (report_type.error_indication_report) {
+    if (report_type.error_indication_report) {
         smf_ue_t *smf_ue = sess->smf_ue;
         smf_sess_t *error_indication_session = NULL;
         ogs_assert(smf_ue);
 
-        ogs_assert(OGS_OK ==
-            smf_pfcp_send_session_report_response(
-                pfcp_xact, sess, OGS_PFCP_CAUSE_REQUEST_ACCEPTED));
-
         error_indication_session = smf_sess_find_by_error_indication_report(
                 smf_ue, &pfcp_req->error_indication_report);
 
-        if (!error_indication_session) return;
+        if (error_indication_session) {
+            ogs_assert(OGS_OK ==
+                smf_5gc_pfcp_send_session_modification_request(
+                    error_indication_session, NULL,
+                    OGS_PFCP_MODIFY_DL_ONLY|OGS_PFCP_MODIFY_DEACTIVATE|
+                    OGS_PFCP_MODIFY_ERROR_INDICATION,
+                    0));
+        }
+    }
 
+    /* TS 29.244 sec 8.2.21: At least one bit shall be set to "1". Several bits may be set to "1". */
+    if (report_type.downlink_data_report || report_type.error_indication_report) {
         ogs_assert(OGS_OK ==
-            smf_5gc_pfcp_send_session_modification_request(
-                error_indication_session, NULL,
-                OGS_PFCP_MODIFY_DL_ONLY|OGS_PFCP_MODIFY_DEACTIVATE|
-                OGS_PFCP_MODIFY_ERROR_INDICATION,
-                0));
-
+            smf_pfcp_send_session_report_response(
+                pfcp_xact, sess, OGS_PFCP_CAUSE_REQUEST_ACCEPTED));
     } else {
         ogs_error("Not supported Report Type[%d]", report_type.value);
         ogs_assert(OGS_OK ==

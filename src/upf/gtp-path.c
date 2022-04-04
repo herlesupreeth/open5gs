@@ -222,7 +222,7 @@ static void _gtpv1_u_recv_cb(short when, ogs_socket_t fd, void *data)
 
     ogs_assert(fd != INVALID_SOCKET);
 
-    pkbuf = ogs_pkbuf_alloc(NULL, OGS_MAX_PKT_LEN);
+    pkbuf = ogs_pkbuf_alloc(packet_pool, OGS_MAX_PKT_LEN);
     ogs_assert(pkbuf);
     ogs_pkbuf_reserve(pkbuf, OGS_TUN_MAX_HEADROOM);
     ogs_pkbuf_put(pkbuf, OGS_MAX_PKT_LEN-OGS_TUN_MAX_HEADROOM);
@@ -338,7 +338,9 @@ static void _gtpv1_u_recv_cb(short when, ogs_socket_t fd, void *data)
         }
 
     } else if (gtp_h->type == OGS_GTPU_MSGTYPE_GPDU) {
+        uint16_t eth_type = 0;
         struct ip *ip_h = NULL;
+        uint32_t *src_addr = NULL;
         ogs_pfcp_object_t *pfcp_object = NULL;
         ogs_pfcp_sess_t *pfcp_sess = NULL;
         ogs_pfcp_pdr_t *pdr = NULL;
@@ -409,16 +411,95 @@ static void _gtpv1_u_recv_cb(short when, ogs_socket_t fd, void *data)
         far = pdr->far;
         ogs_assert(far);
 
-        if (far->dst_if == OGS_PFCP_INTERFACE_CORE) {
-            uint16_t eth_type = 0;
+        if (ip_h->ip_v == 4 && sess->ipv4) {
+            src_addr = &ip_h->ip_src.s_addr;
+            ogs_assert(src_addr);
 
-            if (ip_h->ip_v == 4 && sess->ipv4) {
-                subnet = sess->ipv4->subnet;
-                eth_type = ETHERTYPE_IP;
-            } else if (ip_h->ip_v == 6 && sess->ipv6) {
-                subnet = sess->ipv6->subnet;
-                eth_type = ETHERTYPE_IPV6;
+            /*
+             * From Issue #1354
+             *
+             * Do not check Indirect Tunnel
+             *    pdr->dst_if = OGS_PFCP_INTERFACE_ACCESS;
+             *    far->dst_if = OGS_PFCP_INTERFACE_ACCESS;
+             */
+            if (far->dst_if != OGS_PFCP_INTERFACE_ACCESS) {
+
+                if (src_addr[0] == sess->ipv4->addr[0]) {
+                    /* Source IP address should be matched in uplink */
+                } else {
+                    ogs_error("[DROP] Source IP-%d Spoofing APN:%s SrcIf:%d DstIf:%d TEID:0x%x",
+                                ip_h->ip_v, pdr->dnn, pdr->src_if, far->dst_if, teid);
+                    ogs_error("       SRC:%08X, UE:%08X",
+                        be32toh(src_addr[0]), be32toh(sess->ipv4->addr[0]));
+                    ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
+
+                    goto cleanup;
+                }
             }
+
+            subnet = sess->ipv4->subnet;
+            eth_type = ETHERTYPE_IP;
+
+        } else if (ip_h->ip_v == 6 && sess->ipv6) {
+            struct ip6_hdr *ip6_h = (struct ip6_hdr *)pkbuf->data;
+            ogs_assert(ip6_h);
+            src_addr = (uint32_t *)ip6_h->ip6_src.s6_addr;
+            ogs_assert(src_addr);
+
+            /*
+             * From Issue #1354
+             *
+             * Do not check Router Advertisement
+             *    pdr->src_if = OGS_PFCP_INTERFACE_CP_FUNCTION;
+             *    far->dst_if = OGS_PFCP_INTERFACE_ACCESS;
+             *
+             * Do not check Indirect Tunnel
+             *    pdr->dst_if = OGS_PFCP_INTERFACE_ACCESS;
+             *    far->dst_if = OGS_PFCP_INTERFACE_ACCESS;
+             */
+            if (far->dst_if != OGS_PFCP_INTERFACE_ACCESS) {
+
+                if (IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)src_addr) &&
+                    src_addr[2] == sess->ipv6->addr[2] &&
+                    src_addr[3] == sess->ipv6->addr[3]) {
+                    /*
+                     * if Link-local address,
+                     * Interface Identifier should be matched
+                     */
+                } else if (src_addr[0] == sess->ipv6->addr[0] &&
+                            src_addr[1] == sess->ipv6->addr[1]) {
+                    /*
+                     * If Global address
+                     * 64 bit prefix should be matched
+                     */
+                } else {
+                    ogs_error("[DROP] Source IP-%d Spoofing APN:%s SrcIf:%d DstIf:%d TEID:0x%x",
+                                ip_h->ip_v, pdr->dnn, pdr->src_if, far->dst_if, teid);
+                    ogs_error("SRC:%08x %08x %08x %08x",
+                            be32toh(src_addr[0]), be32toh(src_addr[1]),
+                            be32toh(src_addr[2]), be32toh(src_addr[3]));
+                    ogs_error("UE:%08x %08x %08x %08x",
+                            be32toh(sess->ipv6->addr[0]),
+                            be32toh(sess->ipv6->addr[1]),
+                            be32toh(sess->ipv6->addr[2]),
+                            be32toh(sess->ipv6->addr[3]));
+                    ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
+
+                    goto cleanup;
+                }
+            }
+
+            subnet = sess->ipv6->subnet;
+            eth_type = ETHERTYPE_IPV6;
+
+        } else {
+            ogs_error("Invalid packet [IP version:%d, Packet Length:%d]",
+                    ip_h->ip_v, pkbuf->len);
+            ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
+            goto cleanup;
+        }
+
+        if (far->dst_if == OGS_PFCP_INTERFACE_CORE) {
 
             if (!subnet) {
 #if 0 /* It's redundant log message */
@@ -498,7 +579,14 @@ int upf_gtp_init(void)
 
     config.cluster_2048_pool = ogs_app()->pool.packet;
 
+#if OGS_USE_TALLOC
+    /* allocate a talloc pool for GTP to ensure it doesn't have to go back
+     * to the libc malloc all the time */
+    packet_pool = talloc_pool(__ogs_talloc_core, 1000*1024);
+    ogs_assert(packet_pool);
+#else
     packet_pool = ogs_pkbuf_pool_create(&config);
+#endif
 
     return OGS_OK;
 }
@@ -562,7 +650,7 @@ int upf_gtp_open(void)
      *
      * $ sudo ip tuntap add name ogstun mode tun
      *
-     * Also, before running upf, assign the one IP from IP pool of UE 
+     * Also, before running upf, assign the one IP from IP pool of UE
      * to ogstun. The IP should not be assigned to UE
      *
      * $ sudo ifconfig ogstun 45.45.0.1/16 up
@@ -592,12 +680,12 @@ int upf_gtp_open(void)
         ogs_assert(dev->poll);
     }
 
-    /* 
-     * On Linux, it is possible to create a persistent tun/tap 
-     * interface which will continue to exist even if open5gs quit, 
-     * although this is normally not required. 
-     * It can be useful to set up a tun/tap interface owned 
-     * by a non-root user, so open5gs can be started without 
+    /*
+     * On Linux, it is possible to create a persistent tun/tap
+     * interface which will continue to exist even if open5gs quit,
+     * although this is normally not required.
+     * It can be useful to set up a tun/tap interface owned
+     * by a non-root user, so open5gs can be started without
      * needing any root privileges at all.
      */
 
@@ -631,7 +719,7 @@ void upf_gtp_close(void)
 static void upf_gtp_handle_multicast(ogs_pkbuf_t *recvbuf)
 {
     struct ip *ip_h =  NULL;
-    struct ip6_hdr *ip6_h =  NULL;
+    struct ip6_hdr *ip6_h = NULL;
     ogs_pfcp_user_plane_report_t report;
 
     ip_h = (struct ip *)recvbuf->data;

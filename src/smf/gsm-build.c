@@ -165,7 +165,7 @@ ogs_pkbuf_t *gsm_build_pdu_session_establishment_accept(smf_sess_t *sess)
     }
 
     /* GSM cause */
-    if (sess->ue_pdu_session_type == OGS_PDU_SESSION_TYPE_IPV4V6) {
+    if (sess->ue_session_type == OGS_PDU_SESSION_TYPE_IPV4V6) {
         if (pdu_address->pdn_type == OGS_PDU_SESSION_TYPE_IPV4) {
             pdu_session_establishment_accept->presencemask |=
                 OGS_NAS_5GS_PDU_SESSION_ESTABLISHMENT_ACCEPT_5GSM_CAUSE_PRESENT;
@@ -282,7 +282,8 @@ static void encode_qos_rule_packet_filter(
             qos_rule->pf[i].identifier = pf->identifier;
 
             ogs_pf_content_from_ipfw_rule(
-                    pf->direction, &qos_rule->pf[i].content, &pf->ipfw_rule);
+                    pf->direction, &qos_rule->pf[i].content, &pf->ipfw_rule,
+                    ogs_app()->parameter.no_ipv4v6_local_addr_in_packet_filter);
             i++;
         }
         qos_rule->num_of_packet_filter = i;

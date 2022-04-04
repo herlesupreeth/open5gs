@@ -39,27 +39,12 @@ static OGS_POOL(ogs_pfcp_rule_pool, ogs_pfcp_rule_t);
 
 void ogs_pfcp_context_init(void)
 {
-    struct timeval tv;
     ogs_assert(context_initialized == 0);
 
     /* Initialize SMF context */
     memset(&self, 0, sizeof(ogs_pfcp_context_t));
 
-    /*
-     * PFCP entity uses NTP timestamp(1900), but Open5GS uses UNIX(1970).
-     *
-     * One is the offset between the two epochs. 
-     * Unix uses an epoch located at 1/1/1970-00:00h (UTC) and
-     * NTP uses 1/1/1900-00:00h. This leads to an offset equivalent 
-     * to 70 years in seconds (there are 17 leap years
-     * between the two dates so the offset is
-     *
-     *  (70*365 + 17)*86400 = 2208988800
-     *
-     * to be substracted from NTP time to get Unix struct timeval.
-     */
-    ogs_gettimeofday(&tv);
-    self.pfcp_started = tv.tv_sec + 2208988800;
+    self.pfcp_started = ogs_time_ntp32_now();
 
     ogs_log_install_domain(&__ogs_pfcp_domain, "pfcp", ogs_core()->log.level);
 
@@ -184,6 +169,9 @@ int ogs_pfcp_context_parse_config(const char *local, const char *remote)
                         const char *dev = NULL;
                         ogs_sockaddr_t *addr = NULL;
 
+                        ogs_sockopt_t option;
+                        bool is_option = false;
+
                         if (ogs_yaml_iter_type(&pfcp_array) ==
                                 YAML_MAPPING_NODE) {
                             memcpy(&pfcp_iter, &pfcp_array,
@@ -244,6 +232,11 @@ int ogs_pfcp_context_parse_config(const char *local, const char *remote)
                                 }
                             } else if (!strcmp(pfcp_key, "dev")) {
                                 dev = ogs_yaml_iter_value(&pfcp_iter);
+                            } else if (!strcmp(pfcp_key, "option")) {
+                                rv = ogs_app_config_parse_sockopt(
+                                        &pfcp_iter, &option);
+                                if (rv != OGS_OK) return rv;
+                                is_option = true;
                             } else if (!strcmp(pfcp_key, "apn") ||
                                         !strcmp(pfcp_key, "dnn")) {
                                 /* Skip */
@@ -261,10 +254,12 @@ int ogs_pfcp_context_parse_config(const char *local, const char *remote)
                         if (addr) {
                             if (ogs_app()->parameter.no_ipv4 == 0)
                                 ogs_socknode_add(
-                                        &self.pfcp_list, AF_INET, addr);
+                                    &self.pfcp_list, AF_INET, addr,
+                                    is_option ? &option : NULL);
                             if (ogs_app()->parameter.no_ipv6 == 0)
                                 ogs_socknode_add(
-                                        &self.pfcp_list6, AF_INET6, addr);
+                                    &self.pfcp_list6, AF_INET6, addr,
+                                    is_option ? &option : NULL);
                             ogs_freeaddrinfo(addr);
                         }
 
@@ -274,7 +269,8 @@ int ogs_pfcp_context_parse_config(const char *local, const char *remote)
                                         NULL : &self.pfcp_list,
                                     ogs_app()->parameter.no_ipv6 ?
                                         NULL : &self.pfcp_list6,
-                                    dev, self.pfcp_port);
+                                    dev, self.pfcp_port,
+                                    is_option ? &option : NULL);
                             ogs_assert(rv == OGS_OK);
                         }
 
@@ -288,7 +284,7 @@ int ogs_pfcp_context_parse_config(const char *local, const char *remote)
                                     NULL : &self.pfcp_list,
                                 ogs_app()->parameter.no_ipv6 ?
                                     NULL : &self.pfcp_list6,
-                                NULL, self.pfcp_port);
+                                NULL, self.pfcp_port, NULL);
                         ogs_assert(rv == OGS_OK);
                     }
                 } else if (!strcmp(local_key, "subnet")) {
@@ -611,7 +607,7 @@ int ogs_pfcp_context_parse_config(const char *local, const char *remote)
                         node->num_of_dnn = num_of_dnn;
                         if (num_of_dnn != 0)
                             memcpy(node->dnn, dnn, sizeof(node->dnn));
-                        
+
                         node->num_of_e_cell_id = num_of_e_cell_id;
                         if (num_of_e_cell_id != 0)
                             memcpy(node->e_cell_id, e_cell_id,
@@ -718,7 +714,7 @@ void ogs_pfcp_node_remove_all(ogs_list_t *list)
     ogs_pfcp_node_t *node = NULL, *next_node = NULL;
 
     ogs_assert(list);
-    
+
     ogs_list_for_each_safe(list, next_node, node)
         ogs_pfcp_node_remove(list, node);
 }
@@ -973,8 +969,16 @@ void ogs_pfcp_pdr_associate_urr(ogs_pfcp_pdr_t *pdr, ogs_pfcp_urr_t *urr)
 {
     ogs_assert(pdr);
     ogs_assert(urr);
+    ogs_assert(pdr->num_of_urr < OGS_ARRAY_SIZE(pdr->urr));
+    int i;
 
-    pdr->urr = urr;
+    /* Avoid storing duplicate pointers */
+    for (i = 0; i < pdr->num_of_urr; i++) {
+        if (pdr->urr[i]->id == urr->id)
+            return;
+    }
+
+    pdr->urr[pdr->num_of_urr++] = urr;
 }
 void ogs_pfcp_pdr_associate_qer(ogs_pfcp_pdr_t *pdr, ogs_pfcp_qer_t *qer)
 {
@@ -1209,6 +1213,10 @@ void ogs_pfcp_far_remove(ogs_pfcp_far_t *far)
     ogs_assert(sess);
 
     ogs_list_remove(&sess->far_list, far);
+
+    if (far->hash.teid.len)
+        ogs_hash_set(self.far_teid_hash,
+                &far->hash.teid.key, far->hash.teid.len, NULL);
 
     if (far->hash.f_teid.len)
         ogs_hash_set(self.far_f_teid_hash,
@@ -1629,7 +1637,7 @@ ogs_pfcp_ue_ip_t *ogs_pfcp_ue_ip_alloc(
         if (family == AF_INET)
             ogs_error("     - addr: 10.50.0.1/16");
         else if (family == AF_INET6)
-            ogs_error("     - addr: 2001:230:abcd::1/48");
+            ogs_error("     - addr: 2001:db8:abcd::1/48");
 
         *cause_value = OGS_PFCP_CAUSE_SYSTEM_FAILURE;
         return NULL;

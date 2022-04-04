@@ -119,7 +119,6 @@ void mme_state_operational(ogs_fsm_t *s, mme_event_t *e)
     mme_bearer_t *default_bearer = NULL;
     mme_sess_t *sess = NULL;
 
-    ogs_pkbuf_t *s6abuf = NULL;
     ogs_diam_s6a_message_t *s6a_message = NULL;
 
     ogs_gtp_node_t *gnode = NULL;
@@ -185,10 +184,13 @@ void mme_state_operational(ogs_fsm_t *s, mme_event_t *e)
             ogs_free(addr);
         }
 
-        enb->max_num_of_ostreams =
-                ogs_min(max_num_of_ostreams, enb->max_num_of_ostreams);
+        if (enb->max_num_of_ostreams)
+            enb->max_num_of_ostreams =
+                    ogs_min(max_num_of_ostreams, enb->max_num_of_ostreams);
+        else
+            enb->max_num_of_ostreams = max_num_of_ostreams;
 
-        ogs_debug("eNB-S1 SCTP_COMM_UP[%s] Max Num of Outbound Streams[%d]", 
+        ogs_info("eNB-N2[%s] max_num_of_ostreams : %d",
             OGS_ADDR(enb->sctp.addr, buf), enb->max_num_of_ostreams);
 
         break;
@@ -372,9 +374,9 @@ void mme_state_operational(ogs_fsm_t *s, mme_event_t *e)
             break;
         }
 
-        bearer = mme_bearer_find_or_add_by_message(mme_ue, &nas_message);
+        bearer = mme_bearer_find_or_add_by_message(
+                    mme_ue, &nas_message, e->esm_piggybacked);
         if (!bearer) {
-            ogs_error("mme_bearer_find_or_add_by_message() failed");
             ogs_pkbuf_free(pkbuf);
             break;
         }
@@ -430,9 +432,7 @@ void mme_state_operational(ogs_fsm_t *s, mme_event_t *e)
     case MME_EVT_S6A_MESSAGE:
         mme_ue = e->mme_ue;
         ogs_assert(mme_ue);
-        s6abuf = e->pkbuf;
-        ogs_assert(s6abuf);
-        s6a_message = (ogs_diam_s6a_message_t *)s6abuf->data;
+        s6a_message = e->s6a_message;
         ogs_assert(s6a_message);
 
         enb_ue = enb_ue_cycle(mme_ue->enb_ue);
@@ -441,7 +441,7 @@ void mme_state_operational(ogs_fsm_t *s, mme_event_t *e)
 
             ogs_subscription_data_free(
                     &s6a_message->ula_message.subscription_data);
-            ogs_pkbuf_free(s6abuf);
+            ogs_free(s6a_message);
             break;
         }
 
@@ -467,7 +467,7 @@ void mme_state_operational(ogs_fsm_t *s, mme_event_t *e)
 
             ogs_subscription_data_free(
                     &s6a_message->ula_message.subscription_data);
-            ogs_pkbuf_free(s6abuf);
+            ogs_free(s6a_message);
             break;
         }
 
@@ -507,7 +507,7 @@ void mme_state_operational(ogs_fsm_t *s, mme_event_t *e)
             break;
         }
         ogs_subscription_data_free(&s6a_message->ula_message.subscription_data);
-        ogs_pkbuf_free(s6abuf);
+        ogs_free(s6a_message);
         break;
 
     case MME_EVT_S11_MESSAGE:

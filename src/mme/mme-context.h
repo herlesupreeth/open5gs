@@ -184,6 +184,7 @@ typedef struct mme_vlr_s {
 
     ogs_sock_t      *sock;      /* VLR SGsAP Socket */
     ogs_sockaddr_t  *addr;      /* VLR SGsAP Connected Socket Address */
+    ogs_sockopt_t   *option;    /* VLR SGsAP Socket Option */
     ogs_poll_t      *poll;      /* VLR SGsAP Poll */
 } mme_vlr_t;
 
@@ -390,6 +391,7 @@ struct mme_ue_s {
 
     /* HSS Info */
     ogs_bitrate_t   ambr; /* UE-AMBR */
+    uint32_t        network_access_mode; /* Permitted EPS Attach Type */
 
     uint32_t        context_identifier; /* default APN */
 
@@ -669,7 +671,7 @@ void mme_pgw_remove_all(void);
 ogs_sockaddr_t *mme_pgw_addr_find_by_apn(
         ogs_list_t *list, int family, char *apn);
 
-mme_vlr_t *mme_vlr_add(ogs_sockaddr_t *addr);
+mme_vlr_t *mme_vlr_add(ogs_sockaddr_t *addr, ogs_sockopt_t *option);
 void mme_vlr_remove(mme_vlr_t *vlr);
 void mme_vlr_remove_all(void);
 void mme_vlr_close(mme_vlr_t *vlr);
@@ -703,6 +705,7 @@ void mme_ue_new_guti(mme_ue_t *mme_ue);
 void mme_ue_confirm_guti(mme_ue_t *mme_ue);
 
 mme_ue_t *mme_ue_add(enb_ue_t *enb_ue);
+void mme_ue_hash_remove(mme_ue_t *mme_ue);
 void mme_ue_remove(mme_ue_t *mme_ue);
 void mme_ue_remove_all(void);
 
@@ -787,18 +790,13 @@ mme_sess_t *mme_sess_first(mme_ue_t *mme_ue);
 mme_sess_t *mme_sess_next(mme_sess_t *sess);
 unsigned int mme_sess_count(mme_ue_t *mme_ue);
 
-#define UE_CONTEXT_IN_ATTACH(__mME) mme_ue_in_attach(__mME)
-#define SESSION_CONTEXT_IN_ATTACH(__sESS) mme_sess_in_attach(__sESS)
-bool mme_ue_in_attach(mme_ue_t *mme_ue);
-bool mme_sess_in_attach(mme_sess_t *sess);
-
 mme_bearer_t *mme_bearer_add(mme_sess_t *sess);
 void mme_bearer_remove(mme_bearer_t *bearer);
 void mme_bearer_remove_all(mme_sess_t *sess);
 mme_bearer_t *mme_bearer_find_by_sess_ebi(mme_sess_t *sess, uint8_t ebi);
 mme_bearer_t *mme_bearer_find_by_ue_ebi(mme_ue_t *mme_ue, uint8_t ebi);
 mme_bearer_t *mme_bearer_find_or_add_by_message(
-                                mme_ue_t *mme_ue, ogs_nas_eps_message_t *message);
+        mme_ue_t *mme_ue, ogs_nas_eps_message_t *message, bool esm_piggybacked);
 mme_bearer_t *mme_default_bearer_in_sess(mme_sess_t *sess);
 mme_bearer_t *mme_linked_bearer(mme_bearer_t *bearer);
 mme_bearer_t *mme_bearer_first(mme_sess_t *sess);

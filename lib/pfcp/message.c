@@ -20,7 +20,7 @@
 /*******************************************************************************
  * This file had been created by pfcp-tlv.py script v0.1.0
  * Please do not modify this file but regenerate it via script.
- * Created on: 2021-10-04 22:09:12.905975 by acetcom
+ * Created on: 2022-03-30 17:00:53.610079 by pespin
  * from 29244-g10.docx
  ******************************************************************************/
 
@@ -1575,6 +1575,7 @@ ogs_tlv_desc_t ogs_pfcp_tlv_desc_create_pdr =
         &ogs_pfcp_tlv_desc_outer_header_removal,
         &ogs_pfcp_tlv_desc_far_id,
         &ogs_pfcp_tlv_desc_urr_id,
+        &ogs_tlv_desc_more8,
         &ogs_pfcp_tlv_desc_qer_id,
         &ogs_pfcp_tlv_desc_activate_predefined_rules,
         &ogs_pfcp_tlv_desc_activation_time,
@@ -1758,6 +1759,7 @@ ogs_tlv_desc_t ogs_pfcp_tlv_desc_access_forwarding_action_information_1 =
         &ogs_pfcp_tlv_desc_weight,
         &ogs_pfcp_tlv_desc_priority,
         &ogs_pfcp_tlv_desc_urr_id,
+        &ogs_tlv_desc_more8,
         NULL,
     }
 };
@@ -1775,6 +1777,7 @@ ogs_tlv_desc_t ogs_pfcp_tlv_desc_access_forwarding_action_information_2 =
         &ogs_pfcp_tlv_desc_weight,
         &ogs_pfcp_tlv_desc_priority,
         &ogs_pfcp_tlv_desc_urr_id,
+        &ogs_tlv_desc_more8,
         NULL,
     }
 };
@@ -2681,6 +2684,7 @@ ogs_tlv_desc_t ogs_pfcp_msg_desc_pfcp_session_modification_response =
         &ogs_pfcp_tlv_desc_load_control_information,
         &ogs_pfcp_tlv_desc_overload_control_information,
         &ogs_pfcp_tlv_desc_usage_report_session_modification_response,
+        &ogs_tlv_desc_more8,
         &ogs_pfcp_tlv_desc_failed_rule_id,
         &ogs_pfcp_tlv_desc_additional_usage_reports_information,
         &ogs_pfcp_tlv_desc_created_traffic_endpoint,
@@ -2705,6 +2709,7 @@ ogs_tlv_desc_t ogs_pfcp_msg_desc_pfcp_session_deletion_response =
         &ogs_pfcp_tlv_desc_load_control_information,
         &ogs_pfcp_tlv_desc_overload_control_information,
         &ogs_pfcp_tlv_desc_usage_report_session_deletion_response,
+        &ogs_tlv_desc_more8,
     NULL,
 }};
 
@@ -2716,6 +2721,7 @@ ogs_tlv_desc_t ogs_pfcp_msg_desc_pfcp_session_report_request =
         &ogs_pfcp_tlv_desc_report_type,
         &ogs_pfcp_tlv_desc_downlink_data_report,
         &ogs_pfcp_tlv_desc_usage_report_session_report_request,
+        &ogs_tlv_desc_more8,
         &ogs_pfcp_tlv_desc_error_indication_report,
         &ogs_pfcp_tlv_desc_load_control_information,
         &ogs_pfcp_tlv_desc_overload_control_information,
@@ -2753,7 +2759,7 @@ int ogs_pfcp_parse_msg(ogs_pfcp_message_t *pfcp_message, ogs_pkbuf_t *pkbuf)
 
     h = (ogs_pfcp_header_t *)pkbuf->data;
     ogs_assert(h);
-    
+
     memset(pfcp_message, 0, sizeof(ogs_pfcp_message_t));
 
     if (h->seid_presence)

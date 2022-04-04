@@ -69,7 +69,7 @@ void smf_s5c_handle_create_session_request(
     ogs_assert(xact);
     ogs_assert(req);
 
-    ogs_debug("Create Session Reqeust");
+    ogs_debug("Create Session Request");
 
     cause_value = OGS_GTP_CAUSE_REQUEST_ACCEPTED;
 
@@ -111,30 +111,6 @@ void smf_s5c_handle_create_session_request(
         cause_value = OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
     }
 
-    switch (sess->gtp_rat_type) {
-    case OGS_GTP_RAT_TYPE_EUTRAN:
-        if (req->bearer_contexts_to_be_created.
-                s5_s8_u_sgw_f_teid.presence == 0) {
-            ogs_error("No S5/S8 SGW GTP-U TEID");
-            cause_value = OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
-        }
-        if (req->user_location_information.presence == 0) {
-            ogs_error("No UE Location Information");
-            cause_value = OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
-        }
-        break;
-    case OGS_GTP_RAT_TYPE_WLAN:
-        if (req->bearer_contexts_to_be_created.
-                s2b_u_epdg_f_teid_5.presence == 0) {
-            ogs_error("No S2b ePDG GTP-U TEID");
-            cause_value = OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
-        }
-        break;
-    default:
-        ogs_error("Unknown RAT Type [%d]", req->rat_type.u8);
-        cause_value = OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
-    }
-
     if (!sess) {
         ogs_error("No Context");
         cause_value = OGS_GTP_CAUSE_CONTEXT_NOT_FOUND;
@@ -143,12 +119,32 @@ void smf_s5c_handle_create_session_request(
             ogs_error("No Gx Diameter Peer");
             cause_value = OGS_GTP_CAUSE_REMOTE_PEER_NOT_RESPONDING;
         }
-
-        if (sess->gtp_rat_type == OGS_GTP_RAT_TYPE_WLAN) {
+        switch (sess->gtp_rat_type) {
+        case OGS_GTP_RAT_TYPE_EUTRAN:
+            if (req->bearer_contexts_to_be_created.
+                    s5_s8_u_sgw_f_teid.presence == 0) {
+                ogs_error("No S5/S8 SGW GTP-U TEID");
+                cause_value = OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
+            }
+            if (req->user_location_information.presence == 0) {
+                ogs_error("No UE Location Information");
+                cause_value = OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
+            }
+            break;
+        case OGS_GTP_RAT_TYPE_WLAN:
             if (!ogs_diam_app_connected(OGS_DIAM_S6B_APPLICATION_ID)) {
                 ogs_error("No S6b Diameter Peer");
                 cause_value = OGS_GTP_CAUSE_REMOTE_PEER_NOT_RESPONDING;
             }
+            if (req->bearer_contexts_to_be_created.
+                    s2b_u_epdg_f_teid_5.presence == 0) {
+                ogs_error("No S2b ePDG GTP-U TEID");
+                cause_value = OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
+            }
+            break;
+        default:
+            ogs_error("Unknown RAT Type [%d]", req->rat_type.u8);
+            cause_value = OGS_GTP_CAUSE_MANDATORY_IE_MISSING;
         }
     }
 
@@ -214,7 +210,12 @@ void smf_s5c_handle_create_session_request(
     /* UE IP Address */
     paa = req->pdn_address_allocation.data;
     ogs_assert(paa);
-    sess->session.session_type = paa->session_type;
+
+    /* Store UE Session Type (IPv4, IPv6, IPv4v6) */
+    sess->ue_session_type = paa->session_type;
+
+    /* Initially Set Session Type from UE */
+    sess->session.session_type = sess->ue_session_type;
     rv = ogs_gtp_paa_to_ip(paa, &sess->session.ue_ip);
     ogs_assert(rv == OGS_OK);
 
@@ -421,6 +422,10 @@ void smf_s5c_handle_modify_bearer_request(
 
     ogs_debug("    SGW_S5C_TEID[0x%x] SMF_N4_TEID[0x%x]",
             sess->sgw_s5c_teid, sess->smf_n4_teid);
+
+    /* TODO: Update remote GTP-U IP addr + TEID in the UPF through PFCP, similar
+     * to what is done in smf_gn_handle_update_pdp_context_request()
+     */
 
     memset(&h, 0, sizeof(ogs_gtp_header_t));
     h.type = OGS_GTP_MODIFY_BEARER_RESPONSE_TYPE;

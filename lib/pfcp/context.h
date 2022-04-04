@@ -87,8 +87,8 @@ typedef struct ogs_pfcp_node_s {
     ogs_sock_t      *sock;          /* Socket Instance */
     ogs_sockaddr_t  addr;           /* Remote Address */
 
-    ogs_list_t      local_list;    
-    ogs_list_t      remote_list;   
+    ogs_list_t      local_list;
+    ogs_list_t      remote_list;
 
     ogs_fsm_t       sm;             /* A state machine */
     ogs_timer_t     *t_association; /* timer to retry to associate peer node */
@@ -169,7 +169,10 @@ typedef struct ogs_pfcp_pdr_s {
     uint8_t                 qfi;
 
     ogs_pfcp_far_t          *far;
-    ogs_pfcp_urr_t          *urr;
+
+    int                     num_of_urr;
+    ogs_pfcp_urr_t          *urr[OGS_MAX_NUM_OF_URR];
+
     ogs_pfcp_qer_t          *qer;
 
     int                     num_of_flow;
@@ -231,7 +234,7 @@ typedef struct ogs_pfcp_urr_s {
 
     ogs_pfcp_measurement_method_t meas_method;
     ogs_pfcp_reporting_triggers_t rep_triggers;
-
+    ogs_pfcp_measurement_information_t meas_info;
     ogs_pfcp_measurement_period_t meas_period;
 
     ogs_pfcp_volume_threshold_t vol_threshold;
@@ -315,8 +318,8 @@ typedef struct ogs_pfcp_dev_s {
 typedef struct ogs_pfcp_subnet_s {
     ogs_lnode_t     lnode;
 
-    ogs_ipsubnet_t  sub;                    /* Subnet : 2001:230:cafe::0/48 */
-    ogs_ipsubnet_t  gw;                     /* Gateway : 2001:230:cafe::1 */
+    ogs_ipsubnet_t  sub;                    /* Subnet : 2001:db8:cafe::0/48 */
+    ogs_ipsubnet_t  gw;                     /* Gateway : 2001:db8:cafe::1 */
     char            dnn[OGS_MAX_DNN_LEN+1]; /* DNN : "internet", "volte", .. */
 
 #define OGS_MAX_NUM_OF_SUBNET_RANGE 16

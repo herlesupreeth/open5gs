@@ -328,8 +328,9 @@ static int pcrf_gx_ccr_cb( struct msg **msg, struct avp *avp,
         ret = fd_msg_avp_hdr(avp, &hdr);
         ogs_assert(ret == 0);
 
-        memcpy(&sess_data->addr, hdr->avp_value->os.data,
-                sizeof sess_data->addr);
+        ogs_assert(hdr->avp_value->os.len == sizeof sess_data->addr);
+        memcpy(&sess_data->addr,
+                hdr->avp_value->os.data, hdr->avp_value->os.len);
         pcrf_sess_set_ipv4(&sess_data->addr, sess_data->sid);
         sess_data->ipv4 = 1;
     }
@@ -345,8 +346,8 @@ static int pcrf_gx_ccr_cb( struct msg **msg, struct avp *avp,
 
         paa = (ogs_paa_t *)hdr->avp_value->os.data;
         ogs_assert(paa);
-        ogs_assert(paa->len == OGS_IPV6_LEN * 8 /* 128bit */);
-        memcpy(sess_data->addr6, paa->addr6, sizeof sess_data->addr6);
+        ogs_assert(paa->len == OGS_IPV6_DEFAULT_PREFIX_LEN /* 64bit */);
+        memcpy(sess_data->addr6, paa->addr6, paa->len >> 3);
         pcrf_sess_set_ipv6(sess_data->addr6, sess_data->sid);
         sess_data->ipv6 = 1;
     }

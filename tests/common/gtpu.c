@@ -47,8 +47,10 @@ ogs_socknode_t *test_gtpu_server(int index, int family)
     node = ogs_socknode_new(addr);
     ogs_assert(node);
 
-    sock = ogs_udp_server(node);
+    sock = ogs_udp_server(node->addr, NULL);
     ogs_assert(sock);
+
+    node->sock = sock;
 
     return node;
 }
@@ -340,6 +342,8 @@ int test_gtpu_send_slacc_rs(ogs_socknode_t *node, test_bearer_t *bearer)
     ogs_gtp_extension_header_t ext_hdesc;
 
     ogs_pkbuf_t *pkbuf = NULL;
+    struct ip6_hdr *ip6_h = NULL;
+    uint8_t *src_addr = NULL;
 
     const char *payload =
         "6000000000083aff fe80000000000000 0000000000000002"
@@ -360,6 +364,14 @@ int test_gtpu_send_slacc_rs(ogs_socknode_t *node, test_bearer_t *bearer)
 
     OGS_HEX(payload, strlen(payload), tmp);
     memcpy(pkbuf->data, tmp, payload_len);
+
+    ip6_h = pkbuf->data;
+    ogs_assert(ip6_h);
+
+    src_addr = (uint8_t *)ip6_h->ip6_src.s6_addr;
+    ogs_assert(src_addr);
+
+    memcpy(src_addr + 8, sess->ue_ip.addr6 + 8, 8);
 
     ogs_pkbuf_trim(pkbuf, payload_len);
 

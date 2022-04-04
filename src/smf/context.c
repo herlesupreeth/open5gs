@@ -191,7 +191,7 @@ int smf_context_parse_config(void)
                 const char *smf_key = ogs_yaml_iter_key(&smf_iter);
                 ogs_assert(smf_key);
                 if (!strcmp(smf_key, "freeDiameter")) {
-                    yaml_node_t *node = 
+                    yaml_node_t *node =
                         yaml_document_get_node(document, smf_iter.pair->value);
                     ogs_assert(node);
                     if (node->type == YAML_SCALAR_NODE) {
@@ -204,10 +204,10 @@ int smf_context_parse_config(void)
                             const char *fd_key = ogs_yaml_iter_key(&fd_iter);
                             ogs_assert(fd_key);
                             if (!strcmp(fd_key, "identity")) {
-                                self.diam_config->cnf_diamid = 
+                                self.diam_config->cnf_diamid =
                                     ogs_yaml_iter_value(&fd_iter);
                             } else if (!strcmp(fd_key, "realm")) {
-                                self.diam_config->cnf_diamrlm = 
+                                self.diam_config->cnf_diamrlm =
                                     ogs_yaml_iter_value(&fd_iter);
                             } else if (!strcmp(fd_key, "port")) {
                                 const char *v = ogs_yaml_iter_value(&fd_iter);
@@ -216,7 +216,7 @@ int smf_context_parse_config(void)
                                 const char *v = ogs_yaml_iter_value(&fd_iter);
                                 if (v) self.diam_config->cnf_port_tls = atoi(v);
                             } else if (!strcmp(fd_key, "listen_on")) {
-                                self.diam_config->cnf_addr = 
+                                self.diam_config->cnf_addr =
                                     ogs_yaml_iter_value(&fd_iter);
                             } else if (!strcmp(fd_key, "no_fwd")) {
                                 self.diam_config->cnf_flags.no_fwd =
@@ -299,7 +299,7 @@ int smf_context_parse_config(void)
                                             ogs_yaml_iter_key(&conn_iter);
                                         ogs_assert(conn_key);
                                         if (!strcmp(conn_key, "identity")) {
-                                            identity = 
+                                            identity =
                                                 ogs_yaml_iter_value(&conn_iter);
                                         } else if (!strcmp(conn_key, "addr")) {
                                             addr =
@@ -779,7 +779,11 @@ smf_ue_t *smf_ue_add_by_supi(char *supi)
     ogs_assert(supi);
 
     ogs_pool_alloc(&smf_ue_pool, &smf_ue);
-    ogs_assert(smf_ue);
+    if (!smf_ue) {
+        ogs_error("Maximum number of smf_ue[%lld] reached",
+                    (long long)ogs_app()->max.ue);
+        return NULL;
+    }
     memset(smf_ue, 0, sizeof *smf_ue);
 
     ogs_list_init(&smf_ue->sess_list);
@@ -804,7 +808,11 @@ smf_ue_t *smf_ue_add_by_imsi(uint8_t *imsi, int imsi_len)
     ogs_assert(imsi_len);
 
     ogs_pool_alloc(&smf_ue_pool, &smf_ue);
-    ogs_assert(smf_ue);
+    if (!smf_ue) {
+        ogs_error("Maximum number of smf_ue[%lld] reached",
+                    (long long)ogs_app()->max.ue);
+        return NULL;
+    }
     memset(smf_ue, 0, sizeof *smf_ue);
 
     ogs_list_init(&smf_ue->sess_list);
@@ -997,10 +1005,6 @@ smf_sess_t *smf_sess_add_by_apn(smf_ue_t *smf_ue, char *apn, uint8_t rat_type)
     sess->gtp_rat_type = rat_type;
     ogs_assert(sess->gtp_rat_type);
 
-    /* Setup Timer */
-    sess->t_release_holding = ogs_timer_add(
-            ogs_app()->timer_mgr, smf_timer_release_holding_expire, sess);
-
     memset(&e, 0, sizeof(e));
     e.sess = sess;
     ogs_fsm_create(&sess->sm, smf_gsm_state_initial, smf_gsm_state_final);
@@ -1012,6 +1016,83 @@ smf_sess_t *smf_sess_add_by_apn(smf_ue_t *smf_ue, char *apn, uint8_t rat_type)
 
     stats_add_smf_session();
 
+    return sess;
+}
+
+smf_sess_t *smf_sess_add_by_gtp1_message(ogs_gtp1_message_t *message)
+{
+    smf_ue_t *smf_ue = NULL;
+    smf_sess_t *sess = NULL;
+    char apn[OGS_MAX_APN_LEN+1];
+
+    ogs_gtp1_create_pdp_context_request_t *req = &message->create_pdp_context_request;
+
+    if (req->imsi.presence == 0) {
+        ogs_error("No IMSI");
+        return NULL;
+    }
+    if (req->tunnel_endpoint_identifier_data_i.presence == 0) {
+        ogs_error("No Tunnel Endpoint Identifier Data I");
+        return NULL;
+    }
+    if (req->nsapi.presence == 0) {
+        ogs_error("No NSAPI");
+        return NULL;
+    }
+    if (req->access_point_name.presence == 0) {
+        ogs_error("No APN");
+        return NULL;
+    }
+    if (req->sgsn_address_for_signalling.presence == 0) {
+        ogs_error("No SGSN Address for signalling");
+        return NULL;
+    }
+    if (req->sgsn_address_for_user_traffic.presence == 0) {
+        ogs_error("No SGSN Address for user traffic");
+        return NULL;
+    }
+    if (req->quality_of_service_profile.presence == 0) {
+        ogs_error("No QoS Profile");
+        return NULL;
+    }
+    if (req->rat_type.presence == 0) {
+        ogs_error("No RAT Type");
+        return NULL;
+    }
+
+    if ((ogs_fqdn_parse(apn, req->access_point_name.data,
+            ogs_min(req->access_point_name.len, OGS_MAX_APN_LEN+1))) <= 0) {
+        ogs_error("No APN");
+        return NULL;
+    }
+
+    ogs_trace("smf_sess_add_by_message() [APN:%s]", apn);
+
+    /*
+     * 7.3.1 in 3GPP TS 29.060 Release 16
+     *
+     * If a new Create PDP Context Request is incoming on TEID 0 for an already
+     * active PDP context, this Create PDP Context Request must be considered
+     * related to a new session. The existing PDP context shall be torn down
+     * locally, and the associated PDP contexts deleted locally, before the new
+     * session is created.
+     */
+
+    smf_ue = smf_ue_find_by_imsi(req->imsi.data, req->imsi.len);
+    if (!smf_ue) {
+        smf_ue = smf_ue_add_by_imsi(req->imsi.data, req->imsi.len);
+        if (!smf_ue)
+            return NULL;
+    }
+
+    sess = smf_sess_find_by_apn(smf_ue, apn, req->rat_type.u8);
+    if (sess) {
+        ogs_warn("OLD Session Release [IMSI:%s,APN:%s]",
+                smf_ue->imsi_bcd, sess->session.name);
+        smf_sess_remove(sess);
+    }
+
+    sess = smf_sess_add_by_apn(smf_ue, apn, req->rat_type.u8);
     return sess;
 }
 
@@ -1037,11 +1118,11 @@ smf_sess_t *smf_sess_add_by_gtp_message(ogs_gtp_message_t *message)
     }
 
     ogs_assert(0 < ogs_fqdn_parse(apn, req->access_point_name.data,
-            ogs_min(req->access_point_name.len, OGS_MAX_APN_LEN+1)));
+            ogs_min(req->access_point_name.len, OGS_MAX_APN_LEN)));
 
     ogs_trace("smf_sess_add_by_message() [APN:%s]", apn);
 
-    /* 
+    /*
      * 7.2.1 in 3GPP TS 29.274 Release 15
      *
      * If the new Create Session Request received by the SMF collides with
@@ -1063,12 +1144,13 @@ smf_sess_t *smf_sess_add_by_gtp_message(ogs_gtp_message_t *message)
     smf_ue = smf_ue_find_by_imsi(req->imsi.data, req->imsi.len);
     if (!smf_ue) {
         smf_ue = smf_ue_add_by_imsi(req->imsi.data, req->imsi.len);
-        ogs_assert(smf_ue);
+        if (!smf_ue)
+            return NULL;
     }
 
     sess = smf_sess_find_by_apn(smf_ue, apn, req->rat_type.u8);
     if (sess) {
-        ogs_warn("OLD Session Release [IMSI:%s,APN:%s]",
+        ogs_info("OLD Session Release [IMSI:%s,APN:%s]",
                 smf_ue->imsi_bcd, sess->session.name);
         smf_sess_remove(sess);
     }
@@ -1129,10 +1211,6 @@ smf_sess_t *smf_sess_add_by_psi(smf_ue_t *smf_ue, uint8_t psi)
     /* Set Charging Id */
     sess->charging.id = sess->index;
 
-    /* Setup Timer */
-    sess->t_release_holding = ogs_timer_add(
-            ogs_app()->timer_mgr, smf_timer_release_holding_expire, sess);
-
     memset(&e, 0, sizeof(e));
     e.sess = sess;
     ogs_fsm_create(&sess->sm, smf_gsm_state_initial, smf_gsm_state_final);
@@ -1171,7 +1249,8 @@ smf_sess_t *smf_sess_add_by_sbi_message(ogs_sbi_message_t *message)
     smf_ue = smf_ue_find_by_supi(SmContextCreateData->supi);
     if (!smf_ue) {
         smf_ue = smf_ue_add_by_supi(SmContextCreateData->supi);
-        ogs_assert(smf_ue);
+        if (!smf_ue)
+            return NULL;
     }
 
     sess = smf_sess_find_by_psi(smf_ue, SmContextCreateData->pdu_session_id);
@@ -1396,14 +1475,14 @@ void smf_sess_remove(smf_sess_t *sess)
     int i;
     smf_ue_t *smf_ue = NULL;
     smf_event_t e;
-    
+
     char buf1[OGS_ADDRSTRLEN];
     char buf2[OGS_ADDRSTRLEN];
 
     ogs_assert(sess);
     smf_ue = sess->smf_ue;
     ogs_assert(smf_ue);
-   
+
     ogs_info("Removed Session: UE IMSI:[%s] DNN:[%s:%d] IPv4:[%s] IPv6:[%s]",
             smf_ue->supi ? smf_ue->supi : smf_ue->imsi_bcd,
             sess->session.name, sess->psi,
@@ -1474,8 +1553,6 @@ void smf_sess_remove(smf_sess_t *sess)
 
     /* Free SBI object memory */
     ogs_sbi_object_free(&sess->sbi);
-
-    ogs_timer_delete(sess->t_release_holding);
 
     smf_bearer_remove_all(sess);
 
@@ -2106,7 +2183,7 @@ smf_bearer_t *smf_bearer_find_by_pgw_s5u_teid(
 smf_bearer_t *smf_bearer_find_by_ebi(smf_sess_t *sess, uint8_t ebi)
 {
     smf_bearer_t *bearer = NULL;
-    
+
     ogs_assert(sess);
 
     ogs_list_for_each(&sess->bearer_list, bearer) {
@@ -2121,7 +2198,7 @@ smf_bearer_t *smf_bearer_find_by_pcc_rule_name(
         smf_sess_t *sess, char *pcc_rule_name)
 {
     smf_bearer_t *bearer = NULL;
-    
+
     ogs_assert(sess);
     ogs_assert(pcc_rule_name);
 
@@ -2333,7 +2410,7 @@ void smf_pf_remove_all(smf_bearer_t *bearer)
 smf_pf_t *smf_pf_find_by_id(smf_bearer_t *bearer, uint8_t id)
 {
     smf_pf_t *pf = NULL;
-    
+
     ogs_list_for_each(&bearer->pf_list, pf) {
         if (pf->identifier == id) return pf;
     }
@@ -2366,11 +2443,47 @@ smf_pf_t *smf_pf_next(smf_pf_t *pf)
     return ogs_list_next(pf);
 }
 
+/*
+ * The following code is stolen from osmo-ggsn.
+ * https://github.com/osmocom/osmo-ggsn/blob/master/ggsn/pco.c#L26-L43
+ */
+
+/* determine if IPCP contains given option */
+static const uint8_t *ipcp_contains_option(
+    const ogs_pco_ipcp_t *ipcp, size_t ipcp_len,
+    enum ogs_pco_ipcp_options opt, size_t opt_minlen)
+{
+	const uint8_t *cur_opt = (const uint8_t *)ipcp->options;
+
+	/* iterate over Options and check if protocol contained */
+	while (cur_opt + sizeof(struct ogs_pco_ipcp_options_s) <=
+            (uint8_t*)ipcp + ipcp_len) {
+		const struct ogs_pco_ipcp_options_s *cur_opt_hdr =
+            (const struct ogs_pco_ipcp_options_s *)cur_opt;
+		/* length value includes 2 bytes type/length */
+		if (cur_opt_hdr->len < 2)
+			return NULL;
+		if (cur_opt_hdr->type == opt &&
+		    cur_opt_hdr->len >= 2 + opt_minlen)
+			return cur_opt;
+		cur_opt += cur_opt_hdr->len;
+	}
+	return NULL;
+}
+
+#include "../version.h"
+static const char *pap_welcome = "Welcome to open5gs-smfd " OPEN5GS_VERSION;
+
 int smf_pco_build(uint8_t *pco_buf, uint8_t *buffer, int length)
 {
     int rv;
     ogs_pco_t ue, smf;
-    ogs_pco_ipcp_t pco_ipcp;
+    ogs_pco_pap_t pco_pap;
+    ogs_pco_chap_t pco_chap;
+#define OGS_PCO_MAX_NUM_OF_IPCP 4
+    ogs_pco_ipcp_t pco_ipcp[OGS_PCO_MAX_NUM_OF_IPCP];
+    int num_of_ipcp;
+    int pco_size = 0;
     ogs_ipsubnet_t dns_primary, dns_secondary, dns6_primary, dns6_secondary;
     ogs_ipsubnet_t p_cscf, p_cscf6;
     int size = 0;
@@ -2380,6 +2493,9 @@ int smf_pco_build(uint8_t *pco_buf, uint8_t *buffer, int length)
     ogs_assert(pco_buf);
     ogs_assert(buffer);
     ogs_assert(length);
+
+    num_of_ipcp = 0;
+    memset(&pco_ipcp, 0, sizeof(pco_ipcp));
 
     size = ogs_pco_parse(&ue, buffer, length);
     ogs_assert(size);
@@ -2391,53 +2507,104 @@ int smf_pco_build(uint8_t *pco_buf, uint8_t *buffer, int length)
     for (i = 0; i < ue.num_of_id; i++) {
         uint8_t *data = ue.ids[i].data;
         switch(ue.ids[i].id) {
+        case OGS_PCO_ID_PASSWORD_AUTHENTICATION_PROTOCOL:
+            if (data[0] == 1) { /* Code : Authenticate-Request */
+                memset(&pco_pap, 0, sizeof(ogs_pco_pap_t));
+
+                pco_pap.welcome_len = strlen(pap_welcome);
+                memcpy(pco_pap.welcome, pap_welcome, pco_pap.welcome_len);
+
+                pco_size =
+                    4 + /* sizeof(code+identifier+len) */
+                    1 + /* sizeof(welcome_len) */
+                    pco_pap.welcome_len;
+
+                pco_pap.code = 2; /* Code : Authenticate-Ack */
+                pco_pap.identifier = data[1]; /* Identifier */
+                pco_pap.len = htobe16(pco_size);
+
+                smf.ids[smf.num_of_id].id = ue.ids[i].id;
+                smf.ids[smf.num_of_id].len = pco_size;
+                smf.ids[smf.num_of_id].data = (uint8_t *)&pco_pap;
+                smf.num_of_id++;
+            }
+            break;
         case OGS_PCO_ID_CHALLENGE_HANDSHAKE_AUTHENTICATION_PROTOCOL:
             if (data[0] == 2) { /* Code : Response */
+                memset(&pco_chap, 0, sizeof(ogs_pco_chap_t));
+                pco_size = 4; /* sizeof(code+identifier+len) */
+
+                pco_chap.code = 3; /* Code : Success */
+                pco_chap.identifier = data[1]; /* Identifier */
+                pco_chap.len = htobe16(pco_size);
+
                 smf.ids[smf.num_of_id].id = ue.ids[i].id;
-                smf.ids[smf.num_of_id].len = 4;
-                smf.ids[smf.num_of_id].data =
-                    (uint8_t *)"\x03\x00\x00\x04"; /* Code : Success */
+                smf.ids[smf.num_of_id].len = pco_size;
+                smf.ids[smf.num_of_id].data = (uint8_t *)&pco_chap;
                 smf.num_of_id++;
             }
             break;
         case OGS_PCO_ID_INTERNET_PROTOCOL_CONTROL_PROTOCOL:
             if (data[0] == 1) { /* Code : Configuration Request */
-                uint16_t len = 0;
+                ogs_pco_ipcp_t *ipcp = (ogs_pco_ipcp_t *)data;
+                uint16_t in_len = 0;
+                uint16_t out_len = 0;
+                int num_of_option = 0;
 
                 ogs_assert(smf_self()->dns[0] || smf_self()->dns[1]);
 
-                memset(&pco_ipcp, 0, sizeof(ogs_pco_ipcp_t));
-                pco_ipcp.code = 2; /* Code : Configuration Ack */
-                pco_ipcp.len = htobe16(len);
+                ogs_assert(ipcp);
+                in_len = be16toh(ipcp->len);
 
-                len = 4;
+                ogs_assert(num_of_ipcp <= OGS_PCO_MAX_NUM_OF_IPCP);
+                pco_ipcp[num_of_ipcp].code = 2; /* Code : Configuration Ack */
+
+                out_len = 4;
                 /* Primary DNS Server IP Address */
-                if (smf_self()->dns[0]) {
+                if (smf_self()->dns[0] &&
+                    ipcp_contains_option(ipcp, in_len,
+                        OGS_IPCP_OPT_PRIMARY_DNS, 4)) {
                     rv = ogs_ipsubnet(
                             &dns_primary, smf_self()->dns[0], NULL);
                     ogs_assert(rv == OGS_OK);
-                    pco_ipcp.options[0].type = 129;
-                    pco_ipcp.options[0].len = 6;
-                    pco_ipcp.options[0].addr = dns_primary.sub[0];
-                    len += 6;
+                    ogs_assert(
+                            num_of_option <= OGS_PCO_MAX_NUM_OF_IPCP_OPTIONS);
+                    pco_ipcp[num_of_ipcp].options[num_of_option].type =
+                        OGS_IPCP_OPT_PRIMARY_DNS;
+                    pco_ipcp[num_of_ipcp].options[num_of_option].len = 6;
+                    pco_ipcp[num_of_ipcp].options[num_of_option].addr =
+                        dns_primary.sub[0];
+                    num_of_option++;
+
+                    out_len += 6;
                 }
 
                 /* Secondary DNS Server IP Address */
-                if (smf_self()->dns[1]) {
+                if (smf_self()->dns[1] &&
+                    ipcp_contains_option(ipcp, in_len,
+                        OGS_IPCP_OPT_SECONDARY_DNS, 4)) {
                     rv = ogs_ipsubnet(
                             &dns_secondary, smf_self()->dns[1], NULL);
                     ogs_assert(rv == OGS_OK);
-                    pco_ipcp.options[1].type = 131;
-                    pco_ipcp.options[1].len = 6;
-                    pco_ipcp.options[1].addr = dns_secondary.sub[0];
-                    len += 6;
+                    ogs_assert(
+                            num_of_option <= OGS_PCO_MAX_NUM_OF_IPCP_OPTIONS);
+                    pco_ipcp[num_of_ipcp].options[num_of_option].type =
+                        OGS_IPCP_OPT_SECONDARY_DNS;
+                    pco_ipcp[num_of_ipcp].options[num_of_option].len = 6;
+                    pco_ipcp[num_of_ipcp].options[num_of_option].addr =
+                        dns_secondary.sub[0];
+                    num_of_option++;
+
+                    out_len += 6;
                 }
 
-                pco_ipcp.len = htobe16(len);
+                pco_ipcp[num_of_ipcp].len = htobe16(out_len);
 
                 smf.ids[smf.num_of_id].id = ue.ids[i].id;
-                smf.ids[smf.num_of_id].len = len;
-                smf.ids[smf.num_of_id].data = (uint8_t *)&pco_ipcp;
+                smf.ids[smf.num_of_id].len = out_len;
+                smf.ids[smf.num_of_id].data = (uint8_t *)&pco_ipcp[num_of_ipcp];
+
+                num_of_ipcp++;
 
                 smf.num_of_id++;
             }

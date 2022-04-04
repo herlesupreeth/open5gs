@@ -269,7 +269,7 @@ typedef struct smf_sess_s {
 
     /* PDN Configuration */
     ogs_session_t session;
-    uint8_t ue_pdu_session_type;
+    uint8_t ue_session_type;
     uint8_t ue_ssc_mode;
 
     ogs_pfcp_ue_ip_t *ipv4;
@@ -288,6 +288,10 @@ typedef struct smf_sess_s {
     } gtp; /* Saved from S5-C */
 
     struct {
+        uint8_t nsapi;
+    } gtp1; /* GTPv1C specific fields */
+
+    struct {
         ogs_nas_extended_protocol_configuration_options_t ue_pco;
     } nas; /* Saved from NAS-5GS */
 
@@ -301,9 +305,6 @@ typedef struct smf_sess_s {
         bool ue_requested_pdu_session_establishment_done;
         char *n1n2message_location;
     } paging;
-
-    /* Release Holding timer of SMF session context */
-    ogs_timer_t     *t_release_holding;
 
     /* State */
 #define SMF_NGAP_STATE_NONE                                     0
@@ -364,6 +365,7 @@ void smf_ue_remove_all(void);
 smf_ue_t *smf_ue_find_by_supi(char *supi);
 smf_ue_t *smf_ue_find_by_imsi(uint8_t *imsi, int imsi_len);
 
+smf_sess_t *smf_sess_add_by_gtp1_message(ogs_gtp1_message_t *message);
 smf_sess_t *smf_sess_add_by_gtp_message(ogs_gtp_message_t *message);
 smf_sess_t *smf_sess_add_by_apn(smf_ue_t *smf_ue, char *apn, uint8_t rat_type);
 

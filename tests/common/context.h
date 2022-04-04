@@ -34,7 +34,7 @@ extern "C" {
 #define TEST_GNB_IPV4           TEST_ENB_IPV4
 
 #define TEST_PING_IPV4          "10.45.0.1"
-#define TEST_PING_IPV6          "2001:230:cafe::1"
+#define TEST_PING_IPV6          "2001:db8:cafe::1"
 
 #define MAX_NUM_OF_SERVED_GUAMI     8
 
@@ -523,7 +523,8 @@ bson_t *test_db_new_simple(test_ue_t *test_ue);
 bson_t *test_db_new_qos_flow(test_ue_t *test_ue);
 bson_t *test_db_new_session(test_ue_t *test_ue);
 bson_t *test_db_new_ims(test_ue_t *test_ue);
-bson_t *test_db_new_slice(test_ue_t *test_ue);
+bson_t *test_db_new_slice_with_same_dnn(test_ue_t *test_ue);
+bson_t *test_db_new_slice_with_different_dnn(test_ue_t *test_ue);
 bson_t *test_db_new_non3gpp(test_ue_t *test_ue);
 
 #ifdef __cplusplus
