@@ -169,6 +169,10 @@ int ogs_gtp_context_parse_config(const char *local, const char *remote)
                                         &gtpc_iter, &option);
                                 if (rv != OGS_OK) return rv;
                                 is_option = true;
+                            } else if (!strcmp(gtpc_key, "tac")) {
+                                /* Nothing */
+                            } else if (!strcmp(gtpc_key, "e_cell_id")) {
+                                /* Nothing */
                             } else
                                 ogs_warn("unknown key `%s`", gtpc_key);
                         }
@@ -548,7 +552,7 @@ void ogs_gtp_node_free(ogs_gtp_node_t *node)
 }
 
 ogs_gtp_node_t *ogs_gtp_node_add_by_f_teid(
-        ogs_list_t *list, ogs_gtp_f_teid_t *f_teid, uint16_t port)
+        ogs_list_t *list, ogs_gtp2_f_teid_t *f_teid, uint16_t port)
 {
     int rv;
     ogs_gtp_node_t *node = NULL;
@@ -558,7 +562,7 @@ ogs_gtp_node_t *ogs_gtp_node_add_by_f_teid(
     ogs_assert(f_teid);
     ogs_assert(port);
 
-    rv = ogs_gtp_f_teid_to_sockaddr(f_teid, port, &addr);
+    rv = ogs_gtp2_f_teid_to_sockaddr(f_teid, port, &addr);
     ogs_expect_or_return_val(rv == OGS_OK, NULL);
 
     rv = ogs_filter_ip_version(
@@ -576,7 +580,7 @@ ogs_gtp_node_t *ogs_gtp_node_add_by_f_teid(
     node = ogs_gtp_node_new(addr);
     ogs_assert(node);
 
-    rv = ogs_gtp_f_teid_to_ip(f_teid, &node->ip);
+    rv = ogs_gtp2_f_teid_to_ip(f_teid, &node->ip);
     ogs_expect_or_return_val(rv == OGS_OK, NULL);
 
     ogs_list_add(list, node);
@@ -637,7 +641,7 @@ ogs_gtp_node_t *ogs_gtp_node_find_by_addr(
 }
 
 ogs_gtp_node_t *ogs_gtp_node_find_by_f_teid(
-        ogs_list_t *list, ogs_gtp_f_teid_t *f_teid)
+        ogs_list_t *list, ogs_gtp2_f_teid_t *f_teid)
 {
     int rv;
     ogs_gtp_node_t *node = NULL;
@@ -646,7 +650,7 @@ ogs_gtp_node_t *ogs_gtp_node_find_by_f_teid(
     ogs_assert(list);
     ogs_assert(f_teid);
 
-    rv = ogs_gtp_f_teid_to_ip(f_teid, &ip);
+    rv = ogs_gtp2_f_teid_to_ip(f_teid, &ip);
     ogs_assert(rv == OGS_OK);
 
     ogs_list_for_each(list, node) {

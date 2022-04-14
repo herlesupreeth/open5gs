@@ -24,6 +24,7 @@
 
 #include "ogs-gtp.h"
 #include "ogs-diameter-gx.h"
+#include "ogs-diameter-gy.h"
 #include "ogs-diameter-rx.h"
 #include "ogs-diameter-s6b.h"
 #include "ogs-pfcp.h"
@@ -50,7 +51,20 @@ extern int __gsm_log_domain;
 #undef OGS_LOG_DOMAIN
 #define OGS_LOG_DOMAIN __smf_log_domain
 
+typedef enum {
+    SMF_CTF_ENABLED_AUTO = 0,
+    SMF_CTF_ENABLED_YES,
+    SMF_CTF_ENABLED_NO,
+} smf_ctf_enabled_mode;
+
+typedef struct smf_ctf_config_s {
+    smf_ctf_enabled_mode enabled;
+} smf_ctf_config_t;
+
+int smf_ctf_config_init(smf_ctf_config_t *ctf_config);
+
 typedef struct smf_context_s {
+    smf_ctf_config_t    ctf_config;
     const char*         diam_conf_path;   /* SMF Diameter conf path */
     ogs_diam_config_t   *diam_config;     /* SMF Diameter config */
 
@@ -217,6 +231,7 @@ typedef struct smf_sess_s {
     ogs_ip_t        gnb_n3_ip;      /* gNB-N3 IPv4/IPv6 */
 
     char            *gx_sid;        /* Gx Session ID */
+    char            *gy_sid;        /* Gx Session ID */
     char            *s6b_sid;       /* S6b Session ID */
 
     OGS_POOL(pf_precedence_pool, uint8_t);
@@ -292,6 +307,18 @@ typedef struct smf_sess_s {
     } gtp1; /* GTPv1C specific fields */
 
     struct {
+        uint64_t ul_octets;
+        uint64_t dl_octets;
+        ogs_time_t duration;
+        /* Snapshot of measurement when last report was sent: */
+        struct {
+            uint64_t ul_octets;
+            uint64_t dl_octets;
+            ogs_time_t duration;
+        } last_report;
+    } gy;
+
+    struct {
         ogs_nas_extended_protocol_configuration_options_t ue_pco;
     } nas; /* Saved from NAS-5GS */
 
@@ -358,6 +385,8 @@ smf_context_t *smf_self(void);
 
 int smf_context_parse_config(void);
 
+int smf_use_gy_iface(void);
+
 smf_ue_t *smf_ue_add_by_supi(char *supi);
 smf_ue_t *smf_ue_add_by_imsi(uint8_t *imsi, int imsi_len);
 void smf_ue_remove(smf_ue_t *smf_ue);
@@ -366,7 +395,7 @@ smf_ue_t *smf_ue_find_by_supi(char *supi);
 smf_ue_t *smf_ue_find_by_imsi(uint8_t *imsi, int imsi_len);
 
 smf_sess_t *smf_sess_add_by_gtp1_message(ogs_gtp1_message_t *message);
-smf_sess_t *smf_sess_add_by_gtp_message(ogs_gtp_message_t *message);
+smf_sess_t *smf_sess_add_by_gtp_message(ogs_gtp2_message_t *message);
 smf_sess_t *smf_sess_add_by_apn(smf_ue_t *smf_ue, char *apn, uint8_t rat_type);
 
 smf_sess_t *smf_sess_add_by_sbi_message(ogs_sbi_message_t *message);

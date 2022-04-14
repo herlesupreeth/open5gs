@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2019 by Sukchan Lee <acetcom@gmail.com>
+ * Copyright (C) 2022 by sysmocom - s.f.m.c. GmbH <info@sysmocom.de>
  *
  * This file is part of Open5GS.
  *
@@ -20,10 +21,12 @@
 #include "context.h"
 #include "gtp-path.h"
 #include "pfcp-path.h"
+#include "fd-path.h"
 #include "gx-handler.h"
 #include "binding.h"
 
-void smf_gx_handle_cca_initial_request(
+/* Returns ER_DIAMETER_SUCCESS on success, Diameter error code on failue. */
+uint32_t smf_gx_handle_cca_initial_request(
         smf_sess_t *sess, ogs_diam_gx_message_t *gx_message,
         ogs_gtp_xact_t *gtp_xact)
 {
@@ -47,6 +50,11 @@ void smf_gx_handle_cca_initial_request(
     ogs_debug("[PGW] Create Session Response");
     ogs_debug("    SGW_S5C_TEID[0x%x] PGW_S5C_TEID[0x%x]",
             sess->sgw_s5c_teid, sess->smf_n4_teid);
+
+    if (gx_message->result_code != ER_DIAMETER_SUCCESS)
+        return gx_message->err ? *gx_message->err :
+                                 ER_DIAMETER_AUTHENTICATION_REJECTED;
+
 
     sess->policy.num_of_pcc_rule = gx_message->session_data.num_of_pcc_rule;
     for (i = 0; i < gx_message->session_data.num_of_pcc_rule; i++)
@@ -239,9 +247,7 @@ void smf_gx_handle_cca_initial_request(
         ogs_pfcp_pdr_associate_qer(dl_pdr, qer);
         ogs_pfcp_pdr_associate_qer(ul_pdr, qer);
     }
-
-    ogs_assert(OGS_OK ==
-        smf_epc_pfcp_send_session_establishment_request(sess, gtp_xact));
+    return ER_DIAMETER_SUCCESS;
 }
 
 void smf_gx_handle_cca_termination_request(
